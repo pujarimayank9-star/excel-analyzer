@@ -2,60 +2,40 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Smart Excel Analyzer", page_icon="📊", layout="wide")
+st.set_page_config(page_title="AI Business Analyzer", page_icon="📊", layout="wide")
 
-st.title("📊 Smart Excel Analytics Dashboard")
-st.write("Upload ANY Excel file and get automatic insights")
+st.title("📊 AI Excel Business Analyzer")
+st.write("Upload ANY Excel file → Automatic Charts → Insights → Recommendations")
 
-file = st.file_uploader("Upload Excel File", type=["xlsx"])
+file = st.file_uploader("Upload Excel file", type=["xlsx"])
 
 if file is not None:
 
     df = pd.read_excel(file)
 
-    st.subheader("Raw Data")
+    st.subheader("📄 Raw Data")
     st.dataframe(df)
-
-    # ==========================
-    # Detect columns
-    # ==========================
 
     numeric_cols = df.select_dtypes(include=["number"]).columns
     cat_cols = df.select_dtypes(include=["object"]).columns
 
-    # ==========================
-    # Automatic Charts
-    # ==========================
+    insights = []
+    recommendations = []
 
-    st.header("📊 Automatic Charts")
+    # ------------------------
+    # CATEGORY vs NUMBER
+    # ------------------------
 
-    for col in numeric_cols:
-
-        fig, ax = plt.subplots()
-
-        df[col].plot(kind="hist", ax=ax)
-
-        ax.set_title(f"{col} Distribution")
-
-        st.pyplot(fig)
-
-    # ==========================
-    # Category vs Number
-    # ==========================
-
-    st.header("📊 Category vs Number Comparisons")
+    st.header("📊 Category Analysis")
 
     for cat in cat_cols:
         for num in numeric_cols:
 
             try:
-
-                data = df.groupby(cat)[num].mean()
+                data = df.groupby(cat)[num].sum()
 
                 fig, ax = plt.subplots()
-
                 data.plot(kind="bar", ax=ax)
-
                 ax.set_title(f"{num} by {cat}")
 
                 st.pyplot(fig)
@@ -66,12 +46,20 @@ if file is not None:
                 st.write(f"🏆 Best {cat}: {best}")
                 st.write(f"⚠ Lowest {cat}: {worst}")
 
+                insights.append(
+                    f"{best} generates the highest {num} in {cat}, while {worst} performs the lowest."
+                )
+
+                recommendations.append(
+                    f"Focus more resources on {best} and investigate improvement strategies for {worst}."
+                )
+
             except:
                 pass
 
-    # ==========================
-    # Correlation
-    # ==========================
+    # ------------------------
+    # CORRELATION
+    # ------------------------
 
     if len(numeric_cols) > 1:
 
@@ -92,9 +80,9 @@ if file is not None:
 
         st.pyplot(fig)
 
-    # ==========================
-    # Top Performers
-    # ==========================
+    # ------------------------
+    # TOP PERFORMERS
+    # ------------------------
 
     st.header("🏆 Top Performers")
 
@@ -106,34 +94,14 @@ if file is not None:
                 top = df.groupby(cat)[num].sum().sort_values(ascending=False).head(5)
 
                 st.write(f"Top {cat} by {num}")
-
                 st.dataframe(top)
 
             except:
                 pass
 
-    # ==========================
-    # Profit Analysis
-    # ==========================
-
-    if "Profit" in df.columns and "Product_Category" in df.columns:
-
-        st.header("💰 Profit Analysis")
-
-        profit = df.groupby("Product_Category")["Profit"].sum()
-
-        fig, ax = plt.subplots()
-
-        profit.plot(kind="bar", ax=ax)
-
-        st.pyplot(fig)
-
-        st.write(f"🏆 Most Profitable Product: {profit.idxmax()}")
-        st.write(f"⚠ Least Profitable Product: {profit.idxmin()}")
-
-    # ==========================
-    # Sales Trend (SAFE VERSION)
-    # ==========================
+    # ------------------------
+    # SALES TREND
+    # ------------------------
 
     if "Date" in df.columns and "Weekly_Sales" in df.columns:
 
@@ -157,26 +125,34 @@ if file is not None:
 
         except:
 
-            st.warning("Date format not supported for trend analysis.")
+            st.warning("Date format not supported.")
 
-    # ==========================
-    # Smart Insights
-    # ==========================
+    # ------------------------
+    # AI INSIGHTS
+    # ------------------------
 
-    st.header("🧠 Smart Insights")
+    st.header("🧠 AI Business Insights")
 
-    for cat in cat_cols:
-        for num in numeric_cols:
+    if len(insights) > 0:
 
-            try:
+        for i in insights[:10]:
+            st.write("•", i)
 
-                data = df.groupby(cat)[num].sum()
+    else:
 
-                best = data.idxmax()
-                worst = data.idxmin()
+        st.write("Not enough categorical data.")
 
-                st.write(f"Highest {num} comes from {best} in {cat}")
-                st.write(f"Lowest {num} comes from {worst} in {cat}")
+    # ------------------------
+    # BUSINESS RECOMMENDATIONS
+    # ------------------------
 
-            except:
-                pass
+    st.header("🚀 Business Recommendations")
+
+    if len(recommendations) > 0:
+
+        for r in recommendations[:10]:
+            st.write("•", r)
+
+    else:
+
+        st.write("No recommendations generated.")
