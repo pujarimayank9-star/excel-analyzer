@@ -9,24 +9,46 @@ if file is not None:
 
     df = pd.read_excel(file)
 
-    # Store sales
-    store_sales = df.groupby("Store")["Weekly_Sales"].sum()
+    st.subheader("Raw Data")
+    st.write(df)
 
-    st.subheader("Store Sales")
-    st.bar_chart(store_sales)
+    # ---- Store Sales ----
+    if "Store" in df.columns and "Weekly_Sales" in df.columns:
 
-    # Monthly trend
-    df["Date"] = pd.to_datetime(df["Date"])
-    monthly_sales = df.groupby(df["Date"].dt.to_period("M"))["Weekly_Sales"].sum()
+        store_sales = df.groupby("Store")["Weekly_Sales"].sum()
 
-    st.subheader("Monthly Sales Trend")
-    st.line_chart(monthly_sales)
+        st.subheader("Store Sales")
+        st.bar_chart(store_sales)
 
-    # Insights
+    else:
+        st.error("Excel must contain columns: Store and Weekly_Sales")
+
+    # ---- Monthly Trend ----
+    if "Date" in df.columns:
+
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+        monthly_sales = df.groupby(df["Date"].dt.month)["Weekly_Sales"].sum()
+
+        st.subheader("Monthly Sales Trend")
+        st.line_chart(monthly_sales)
+
+    else:
+        st.warning("Date column not found. Monthly trend skipped.")
+
+    # ---- Insights ----
     st.subheader("Insights")
 
-    top_store = store_sales.idxmax()
-    best_month = monthly_sales.idxmax()
+    if "Store" in df.columns and "Weekly_Sales" in df.columns:
 
-    st.write(f"Top performing store: {top_store}")
-    st.write(f"Best sales month: {best_month}")
+        top_store = store_sales.idxmax()
+        top_sales = store_sales.max()
+
+        st.write(f"Top performing store: {top_store}")
+        st.write(f"Total sales of top store: {top_sales}")
+
+    if "Date" in df.columns:
+
+        best_month = monthly_sales.idxmax()
+
+        st.write(f"Best sales month: {best_month}")
