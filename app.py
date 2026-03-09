@@ -1,20 +1,20 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
 st.set_page_config(
-    page_title="Universal Excel Analyzer",
+    page_title="Smart Excel Analyzer",
     page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 Universal Excel Analyzer")
-st.write("Upload ANY Excel file and get automatic charts, insights and analysis")
+st.title("📊 Smart Excel Analyzer")
+st.write("Upload ANY Excel file and get deep analysis & comparisons")
 
 file = st.file_uploader("Upload Excel File", type=["xlsx","csv"])
 
 if file is not None:
 
-    # Read file
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
     else:
@@ -24,51 +24,95 @@ if file is not None:
     st.dataframe(df)
 
     numeric_cols = df.select_dtypes(include="number").columns
-    text_cols = df.select_dtypes(include="object").columns
+    cat_cols = df.select_dtypes(include="object").columns
 
-    st.subheader("📊 Automatic Charts")
+    # ----------------------
+    # Numeric statistics
+    # ----------------------
 
-    # Numeric charts
-    for col in numeric_cols:
-        st.write(f"{col} Distribution")
-        st.bar_chart(df[col])
-
-    # Category charts
-    for col in text_cols:
-        counts = df[col].value_counts()
-        if len(counts) < 20:
-            st.write(f"{col} Categories")
-            st.bar_chart(counts)
-
-    st.subheader("📈 Automatic Insights")
+    st.subheader("📈 Numeric Analysis")
 
     for col in numeric_cols:
 
-        avg = round(df[col].mean(),2)
-        maximum = df[col].max()
-        minimum = df[col].min()
+        avg = df[col].mean()
+        max_val = df[col].max()
+        min_val = df[col].min()
 
         c1,c2,c3 = st.columns(3)
 
         with c1:
-            st.metric(f"Average {col}",avg)
+            st.metric(f"Average {col}", round(avg,2))
 
         with c2:
-            st.metric(f"Max {col}",maximum)
+            st.metric(f"Max {col}", max_val)
 
         with c3:
-            st.metric(f"Min {col}",minimum)
+            st.metric(f"Min {col}", min_val)
 
-        # AI-style analysis
-        st.subheader(f"🤖 Analysis for {col}")
+        st.bar_chart(df[col])
 
-        if avg > (maximum * 0.7):
-            st.write(f"The average {col} is relatively high compared to the maximum value.")
+        st.write(f"Range of {col}: {max_val-min_val}")
 
-        elif avg < (maximum * 0.4):
-            st.write(f"The average {col} is relatively low compared to the maximum value.")
+    # ----------------------
+    # Category comparisons
+    # ----------------------
+
+    st.subheader("📊 Category vs Number Comparisons")
+
+    for cat in cat_cols:
+
+        if df[cat].nunique() < 15:
+
+            for num in numeric_cols:
+
+                st.write(f"{num} by {cat}")
+
+                grouped = df.groupby(cat)[num].mean()
+
+                st.bar_chart(grouped)
+
+                top = grouped.idxmax()
+                bottom = grouped.idxmin()
+
+                st.write(f"🏆 Best {cat}: {top}")
+                st.write(f"⚠ Lowest {cat}: {bottom}")
+
+    # ----------------------
+    # Correlation analysis
+    # ----------------------
+
+    if len(numeric_cols) > 1:
+
+        st.subheader("🔍 Correlation Analysis")
+
+        corr = df[numeric_cols].corr()
+
+        st.write(corr)
+
+        fig, ax = plt.subplots()
+        cax = ax.matshow(corr)
+        plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
+        plt.yticks(range(len(corr.columns)), corr.columns)
+
+        st.pyplot(fig)
+
+    # ----------------------
+    # Deep insights
+    # ----------------------
+
+    st.subheader("🤖 Automatic Insights")
+
+    for num in numeric_cols:
+
+        avg = df[num].mean()
+
+        if avg > df[num].max()*0.7:
+            st.write(f"{num} values are generally high.")
+
+        elif avg < df[num].max()*0.4:
+            st.write(f"{num} values are generally low.")
 
         else:
-            st.write(f"The {col} values are moderately distributed.")
+            st.write(f"{num} values are moderately distributed.")
 
-        st.write(f"Range of {col} is {maximum - minimum}.")
+    st.write("Analysis complete.")
