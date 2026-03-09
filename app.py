@@ -16,32 +16,32 @@ if file is not None:
     st.subheader("Raw Data")
     st.dataframe(df)
 
-    # ===============================
-    # Detect numeric and category columns
-    # ===============================
+    # ==========================
+    # Detect columns
+    # ==========================
 
-    numeric_cols = df.select_dtypes(include=['number']).columns
-    cat_cols = df.select_dtypes(include=['object']).columns
+    numeric_cols = df.select_dtypes(include=["number"]).columns
+    cat_cols = df.select_dtypes(include=["object"]).columns
 
-    # ===============================
+    # ==========================
     # Automatic Charts
-    # ===============================
+    # ==========================
 
     st.header("📊 Automatic Charts")
 
-    if len(numeric_cols) > 0:
-        for num in numeric_cols:
+    for col in numeric_cols:
 
-            fig, ax = plt.subplots()
-            df[num].plot(kind="hist", ax=ax)
+        fig, ax = plt.subplots()
 
-            ax.set_title(f"{num} Distribution")
+        df[col].plot(kind="hist", ax=ax)
 
-            st.pyplot(fig)
+        ax.set_title(f"{col} Distribution")
 
-    # ===============================
-    # Category vs Number Comparison
-    # ===============================
+        st.pyplot(fig)
+
+    # ==========================
+    # Category vs Number
+    # ==========================
 
     st.header("📊 Category vs Number Comparisons")
 
@@ -53,6 +53,7 @@ if file is not None:
                 data = df.groupby(cat)[num].mean()
 
                 fig, ax = plt.subplots()
+
                 data.plot(kind="bar", ax=ax)
 
                 ax.set_title(f"{num} by {cat}")
@@ -68,9 +69,9 @@ if file is not None:
             except:
                 pass
 
-    # ===============================
-    # Correlation Analysis
-    # ===============================
+    # ==========================
+    # Correlation
+    # ==========================
 
     if len(numeric_cols) > 1:
 
@@ -81,6 +82,7 @@ if file is not None:
         st.dataframe(corr)
 
         fig, ax = plt.subplots()
+
         cax = ax.matshow(corr)
 
         plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
@@ -90,9 +92,9 @@ if file is not None:
 
         st.pyplot(fig)
 
-    # ===============================
+    # ==========================
     # Top Performers
-    # ===============================
+    # ==========================
 
     st.header("🏆 Top Performers")
 
@@ -104,52 +106,62 @@ if file is not None:
                 top = df.groupby(cat)[num].sum().sort_values(ascending=False).head(5)
 
                 st.write(f"Top {cat} by {num}")
+
                 st.dataframe(top)
 
             except:
                 pass
 
-    # ===============================
+    # ==========================
     # Profit Analysis
-    # ===============================
+    # ==========================
 
     if "Profit" in df.columns and "Product_Category" in df.columns:
 
         st.header("💰 Profit Analysis")
 
-        profit_data = df.groupby("Product_Category")["Profit"].sum()
+        profit = df.groupby("Product_Category")["Profit"].sum()
 
         fig, ax = plt.subplots()
-        profit_data.plot(kind="bar", ax=ax)
+
+        profit.plot(kind="bar", ax=ax)
 
         st.pyplot(fig)
 
-        best = profit_data.idxmax()
-        worst = profit_data.idxmin()
+        st.write(f"🏆 Most Profitable Product: {profit.idxmax()}")
+        st.write(f"⚠ Least Profitable Product: {profit.idxmin()}")
 
-        st.write(f"🏆 Most Profitable Product: {best}")
-        st.write(f"⚠ Least Profitable Product: {worst}")
-
-    # ===============================
-    # Sales Trend
-    # ===============================
+    # ==========================
+    # Sales Trend (SAFE VERSION)
+    # ==========================
 
     if "Date" in df.columns and "Weekly_Sales" in df.columns:
 
         st.header("📈 Sales Trend")
 
-        df["Date"] = pd.to_datetime(df["Date"])
+        try:
 
-        trend = df.groupby("Date")["Weekly_Sales"].sum()
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
-        fig, ax = plt.subplots()
-        trend.plot(ax=ax)
+            df2 = df.dropna(subset=["Date"])
 
-        st.pyplot(fig)
+            trend = df2.groupby("Date")["Weekly_Sales"].sum()
 
-    # ===============================
-    # Smart Business Insights
-    # ===============================
+            fig, ax = plt.subplots()
+
+            trend.plot(ax=ax)
+
+            ax.set_title("Sales Over Time")
+
+            st.pyplot(fig)
+
+        except:
+
+            st.warning("Date format not supported for trend analysis.")
+
+    # ==========================
+    # Smart Insights
+    # ==========================
 
     st.header("🧠 Smart Insights")
 
