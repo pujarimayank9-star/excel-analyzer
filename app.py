@@ -2,59 +2,73 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(
-    page_title="Sales Analytics Dashboard",
+    page_title="Universal Excel Analyzer",
     page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 Sales Analytics Dashboard")
-st.markdown("Upload your Excel file and get instant insights")
+st.title("📊 Universal Excel Analyzer")
+st.write("Upload ANY Excel file and get automatic charts, insights and analysis")
 
-file = st.file_uploader("Upload Excel File", type=["xlsx"])
+file = st.file_uploader("Upload Excel File", type=["xlsx","csv"])
 
 if file is not None:
 
-    df = pd.read_excel(file)
+    # Read file
+    if file.name.endswith(".csv"):
+        df = pd.read_csv(file)
+    else:
+        df = pd.read_excel(file)
 
     st.subheader("Raw Data")
     st.dataframe(df)
 
-    # Store Sales
-    store_sales = df.groupby("Store")["Weekly_Sales"].sum()
+    numeric_cols = df.select_dtypes(include="number").columns
+    text_cols = df.select_dtypes(include="object").columns
 
-    # Monthly Trend
-    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
-    df["Month"] = df["Date"].dt.month
+    st.subheader("📊 Automatic Charts")
 
-    monthly_sales = df.groupby("Month")["Weekly_Sales"].sum()
+    # Numeric charts
+    for col in numeric_cols:
+        st.write(f"{col} Distribution")
+        st.bar_chart(df[col])
 
-    st.subheader("Sales Charts")
+    # Category charts
+    for col in text_cols:
+        counts = df[col].value_counts()
+        if len(counts) < 20:
+            st.write(f"{col} Categories")
+            st.bar_chart(counts)
 
-    col1, col2 = st.columns(2)
+    st.subheader("📈 Automatic Insights")
 
-    with col1:
-        st.write("Store Performance")
-        st.bar_chart(store_sales)
+    for col in numeric_cols:
 
-    with col2:
-        st.write("Monthly Sales Trend")
-        st.line_chart(monthly_sales)
+        avg = round(df[col].mean(),2)
+        maximum = df[col].max()
+        minimum = df[col].min()
 
-    # Insights
-    top_store = store_sales.idxmax()
-    top_sales = store_sales.max()
+        c1,c2,c3 = st.columns(3)
 
-    best_month = monthly_sales.idxmax()
+        with c1:
+            st.metric(f"Average {col}",avg)
 
-    st.subheader("Insights")
+        with c2:
+            st.metric(f"Max {col}",maximum)
 
-    c1, c2, c3 = st.columns(3)
+        with c3:
+            st.metric(f"Min {col}",minimum)
 
-    with c1:
-        st.metric("Top Store", top_store)
+        # AI-style analysis
+        st.subheader(f"🤖 Analysis for {col}")
 
-    with c2:
-        st.metric("Top Store Sales", top_sales)
+        if avg > (maximum * 0.7):
+            st.write(f"The average {col} is relatively high compared to the maximum value.")
 
-    with c3:
-        st.metric("Best Sales Month", best_month)
+        elif avg < (maximum * 0.4):
+            st.write(f"The average {col} is relatively low compared to the maximum value.")
+
+        else:
+            st.write(f"The {col} values are moderately distributed.")
+
+        st.write(f"Range of {col} is {maximum - minimum}.")
