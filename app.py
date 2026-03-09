@@ -1,7 +1,14 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Excel Sales Analyzer")
+st.set_page_config(
+    page_title="Sales Analytics Dashboard",
+    page_icon="📊",
+    layout="wide"
+)
+
+st.title("📊 Sales Analytics Dashboard")
+st.markdown("Upload your Excel file and get instant insights")
 
 file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
@@ -10,45 +17,44 @@ if file is not None:
     df = pd.read_excel(file)
 
     st.subheader("Raw Data")
-    st.write(df)
+    st.dataframe(df)
 
-    # ---- Store Sales ----
-    if "Store" in df.columns and "Weekly_Sales" in df.columns:
+    # Store Sales
+    store_sales = df.groupby("Store")["Weekly_Sales"].sum()
 
-        store_sales = df.groupby("Store")["Weekly_Sales"].sum()
+    # Monthly Trend
+    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
+    df["Month"] = df["Date"].dt.month
 
-        st.subheader("Store Sales")
+    monthly_sales = df.groupby("Month")["Weekly_Sales"].sum()
+
+    st.subheader("Sales Charts")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("Store Performance")
         st.bar_chart(store_sales)
 
-    else:
-        st.error("Excel must contain columns: Store and Weekly_Sales")
-
-    # ---- Monthly Trend ----
-    if "Date" in df.columns:
-
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
-        monthly_sales = df.groupby(df["Date"].dt.month)["Weekly_Sales"].sum()
-
-        st.subheader("Monthly Sales Trend")
+    with col2:
+        st.write("Monthly Sales Trend")
         st.line_chart(monthly_sales)
 
-    else:
-        st.warning("Date column not found. Monthly trend skipped.")
+    # Insights
+    top_store = store_sales.idxmax()
+    top_sales = store_sales.max()
 
-    # ---- Insights ----
+    best_month = monthly_sales.idxmax()
+
     st.subheader("Insights")
 
-    if "Store" in df.columns and "Weekly_Sales" in df.columns:
+    c1, c2, c3 = st.columns(3)
 
-        top_store = store_sales.idxmax()
-        top_sales = store_sales.max()
+    with c1:
+        st.metric("Top Store", top_store)
 
-        st.write(f"Top performing store: {top_store}")
-        st.write(f"Total sales of top store: {top_sales}")
+    with c2:
+        st.metric("Top Store Sales", top_sales)
 
-    if "Date" in df.columns:
-
-        best_month = monthly_sales.idxmax()
-
-        st.write(f"Best sales month: {best_month}")
+    with c3:
+        st.metric("Best Sales Month", best_month)
