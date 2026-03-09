@@ -24,3 +24,15 @@ if file:
     top_store = store_sales.idxmax()
 
     st.write(f"Top performing store is Store {top_store}")
+# Insights section
+
+top_store = store_sales.idxmax()
+top_sales = store_sales.max()
+
+best_month = monthly_sales.idxmax()
+best_month_sales = monthly_sales.max()
+
+st.subheader("Insights")
+
+st.write(f"Top performing store is Store {top_store} with total sales of {top_sales:.2f}.")
+st.write(f"The highest sales month is {best_month} with sales of {best_month_sales:.2f}.")
