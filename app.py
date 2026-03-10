@@ -17,7 +17,7 @@ def generate_ppt(insights):
 
     slide = prs.slides.add_slide(prs.slide_layouts[0])
     slide.shapes.title.text = "AI Data Analysis Report"
-    slide.placeholders[1].text = "Automatically generated analysis"
+    slide.placeholders[1].text = "Automatically generated insights"
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Key Insights"
@@ -41,7 +41,11 @@ if uploaded_file:
 
     insights = []
 
-    st.subheader("Dataset Overview")
+# -------------------------
+# DATASET OVERVIEW
+# -------------------------
+
+    st.header("Dataset Overview")
 
     c1,c2,c3 = st.columns(3)
 
@@ -49,11 +53,11 @@ if uploaded_file:
     c2.metric("Columns", df.shape[1])
     c3.metric("Numeric Columns", len(numeric_cols))
 
-# ----------------------------
+# -------------------------
 # NUMERIC ANALYSIS
-# ----------------------------
+# -------------------------
 
-    if len(numeric_cols)>0:
+    if numeric_cols:
 
         st.header("Numeric Analysis")
 
@@ -69,7 +73,7 @@ if uploaded_file:
             c2.metric(f"{col} Max", mx)
             c3.metric(f"{col} Min", mn)
 
-            insights.append(f"{col} average is {round(avg,2)}")
+            insights.append(f"{col} average value is {round(avg,2)}")
 
             fig, ax = plt.subplots()
 
@@ -81,11 +85,11 @@ if uploaded_file:
 
             st.write(f"{col} distribution shows spread of values.")
 
-# ----------------------------
+# -------------------------
 # CATEGORY BASED ANALYSIS
-# ----------------------------
+# -------------------------
 
-    if len(cat_cols)>0 and len(numeric_cols)>0:
+    if cat_cols and numeric_cols:
 
         st.header("Category Based Analysis")
 
@@ -93,104 +97,124 @@ if uploaded_file:
 
             for num in numeric_cols:
 
-                grouped = df.groupby(cat)[num].mean()
+                try:
 
-                fig, ax = plt.subplots()
+                    grouped = df.groupby(cat)[num].mean()
 
-                grouped.plot(kind="bar", ax=ax)
+                    fig, ax = plt.subplots()
 
-                ax.set_title(f"{cat} vs {num}")
+                    grouped.plot(kind="bar", ax=ax)
 
-                st.pyplot(fig)
+                    ax.set_title(f"{cat} vs {num}")
 
-                best = grouped.idxmax()
-                worst = grouped.idxmin()
+                    st.pyplot(fig)
 
-                st.write(f"Best {cat} based on {num}: **{best}**")
-                st.write(f"Worst {cat} based on {num}: **{worst}**")
+                    best = grouped.idxmax()
+                    worst = grouped.idxmin()
 
-                insights.append(f"{best} performs best in {cat} for {num}")
-                insights.append(f"{worst} performs worst in {cat} for {num}")
+                    st.write(f"Best {cat} based on {num}: **{best}**")
+                    st.write(f"Worst {cat} based on {num}: **{worst}**")
 
-# ----------------------------
+                    insights.append(f"{best} performs best in {cat} for {num}")
+                    insights.append(f"{worst} performs worst in {cat} for {num}")
+
+                except:
+                    pass
+
+# -------------------------
 # CATEGORY CONTRIBUTION
-# ----------------------------
+# -------------------------
 
-    if len(cat_cols)>0:
+    if cat_cols:
 
         st.header("Category Contribution")
 
         for cat in cat_cols:
 
-            counts = df[cat].value_counts()
+            try:
 
-            fig, ax = plt.subplots()
+                counts = df[cat].value_counts()
 
-            counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
+                fig, ax = plt.subplots()
 
-            ax.set_ylabel("")
+                counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
 
-            st.pyplot(fig)
+                ax.set_ylabel("")
 
-            insights.append(f"{cat} distribution analyzed")
+                st.pyplot(fig)
 
-# ----------------------------
+                insights.append(f"{cat} distribution analyzed")
+
+            except:
+                pass
+
+# -------------------------
 # CORRELATION
-# ----------------------------
+# -------------------------
 
-    if len(numeric_cols)>1:
+    if len(numeric_cols) > 1:
 
         st.header("Correlation Heatmap")
 
-        corr = df[numeric_cols].corr()
+        try:
 
-        fig, ax = plt.subplots()
+            corr = df[numeric_cols].corr()
 
-        cax = ax.matshow(corr)
+            fig, ax = plt.subplots()
 
-        fig.colorbar(cax)
+            cax = ax.matshow(corr)
 
-        ax.set_xticks(range(len(corr.columns)))
-        ax.set_xticklabels(corr.columns, rotation=90)
+            fig.colorbar(cax)
 
-        ax.set_yticks(range(len(corr.columns)))
-        ax.set_yticklabels(corr.columns)
+            ax.set_xticks(range(len(corr.columns)))
+            ax.set_xticklabels(corr.columns, rotation=90)
 
-        st.pyplot(fig)
+            ax.set_yticks(range(len(corr.columns)))
+            ax.set_yticklabels(corr.columns)
 
-        insights.append("Correlation between numeric variables analyzed")
+            st.pyplot(fig)
 
-# ----------------------------
-# RELATIONSHIP SCATTER
-# ----------------------------
+            insights.append("Correlation between numeric variables analyzed")
 
-    if len(numeric_cols)>1:
+        except:
+            pass
+
+# -------------------------
+# NUMERIC RELATIONSHIPS
+# -------------------------
+
+    if len(numeric_cols) > 1:
 
         st.header("Numeric Relationships")
 
         for i in range(len(numeric_cols)-1):
 
-            x = numeric_cols[i]
-            y = numeric_cols[i+1]
+            try:
 
-            fig, ax = plt.subplots()
+                x = numeric_cols[i]
+                y = numeric_cols[i+1]
 
-            ax.scatter(df[x], df[y])
+                fig, ax = plt.subplots()
 
-            ax.set_xlabel(x)
-            ax.set_ylabel(y)
+                ax.scatter(df[x], df[y])
 
-            ax.set_title(f"{x} vs {y}")
+                ax.set_xlabel(x)
+                ax.set_ylabel(y)
 
-            st.pyplot(fig)
+                ax.set_title(f"{x} vs {y}")
 
-# ----------------------------
+                st.pyplot(fig)
+
+            except:
+                pass
+
+# -------------------------
 # TREND ANALYSIS (SAFE)
-# ----------------------------
+# -------------------------
 
     st.header("Trend Analysis")
 
-    date_cols = []
+    date_column = None
 
     for col in df.columns:
 
@@ -198,42 +222,47 @@ if uploaded_file:
 
             converted = pd.to_datetime(df[col], errors="coerce")
 
-            if converted.notna().sum() > len(df)*0.6:
+            if converted.notna().sum() > len(df)*0.8:
 
-                date_cols.append(col)
+                date_column = col
+                df[col] = converted
+                break
 
         except:
             pass
 
-    if len(date_cols)>0:
+    if date_column:
 
-        date_col = date_cols[0]
+        st.write(f"Detected date column: {date_column}")
 
-        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-
-        df = df.dropna(subset=[date_col])
+        df = df.dropna(subset=[date_column])
 
         for num in numeric_cols:
 
-            trend = df.groupby(date_col)[num].sum()
+            try:
 
-            fig, ax = plt.subplots()
+                trend = df[[date_column,num]].dropna()
 
-            trend.plot(ax=ax)
+                trend = trend.sort_values(date_column)
 
-            ax.set_title(f"{num} Trend Over Time")
+                fig, ax = plt.subplots()
 
-            st.pyplot(fig)
+                ax.plot(trend[date_column], trend[num])
 
-            insights.append(f"{num} trend over time analyzed")
+                ax.set_title(f"{num} Trend Over Time")
+
+                st.pyplot(fig)
+
+            except:
+                pass
 
     else:
 
-        st.write("No valid date column detected for trend analysis.")
+        st.info("No proper date column detected. Trend analysis skipped.")
 
-# ----------------------------
+# -------------------------
 # AI INSIGHTS
-# ----------------------------
+# -------------------------
 
     st.header("AI Insights")
 
@@ -241,9 +270,9 @@ if uploaded_file:
 
         st.write("•", i)
 
-# ----------------------------
+# -------------------------
 # PPT GENERATOR
-# ----------------------------
+# -------------------------
 
     if st.button("Generate PowerPoint Report"):
 
