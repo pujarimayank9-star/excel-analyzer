@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
 from pptx import Presentation
 from pptx.util import Inches
 import tempfile
@@ -13,58 +14,115 @@ file = st.file_uploader("Upload Excel / CSV", type=["xlsx","csv"])
 
 if file:
 
+    # --------------------------
+    # LOAD DATA
+    # --------------------------
+
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
     else:
         df = pd.read_excel(file)
 
-    st.subheader("Dataset Preview")
-    st.dataframe(df)
+    st.header("Dataset Overview")
+    st.write(f"Rows: {df.shape[0]} | Columns: {df.shape[1]}")
+    st.dataframe(df.head())
 
     numeric_cols = df.select_dtypes(include=["int64","float64"]).columns
     cat_cols = df.select_dtypes(include=["object"]).columns
 
-    charts = []
     insights = []
     recommendations = []
+    charts = []
 
-    # -----------------------
+    # --------------------------
+    # HISTOGRAM INSIGHT
+    # --------------------------
+
+    def histogram_insight(col, avg, mn, mx):
+        templates = [
+            f"{col} ranges from {mn} to {mx} with an average of {round(avg,2)} indicating variability.",
+            f"The distribution of {col} spans between {mn} and {mx} with mean around {round(avg,2)}.",
+            f"{col} values vary from {mn} to {mx} suggesting moderate spread."
+        ]
+        return random.choice(templates)
+
+    # --------------------------
+    # BAR INSIGHT
+    # --------------------------
+
+    def bar_insight(col, data):
+        best = data.idxmax()
+        worst = data.idxmin()
+
+        templates = [
+            f"{best} shows the highest value in {col} while {worst} records the lowest.",
+            f"In {col}, {best} leads performance whereas {worst} appears weakest.",
+            f"{best} dominates the {col} comparison while {worst} contributes least."
+        ]
+
+        return random.choice(templates), best, worst
+
+    # --------------------------
+    # PIE INSIGHT
+    # --------------------------
+
+    def pie_insight(col, counts):
+        top = counts.idxmax()
+        percent = round((counts.max()/counts.sum())*100,1)
+
+        templates = [
+            f"{top} represents the largest share in {col} contributing about {percent}%.",
+            f"{top} dominates the {col} distribution with roughly {percent}% share.",
+            f"{top} accounts for the highest portion of {col}."
+        ]
+
+        return random.choice(templates)
+
+    # --------------------------
+    # RECOMMENDATION
+    # --------------------------
+
+    def recommendation(best, worst, col):
+        templates = [
+            f"Investigate why {best} performs better in {col} and replicate its strategy.",
+            f"Focus on improving performance of {worst} within {col}.",
+            f"Strategies used by {best} could help improve other segments in {col}."
+        ]
+        return random.choice(templates)
+
+    # --------------------------
     # NUMERIC ANALYSIS
-    # -----------------------
+    # --------------------------
 
     st.header("Numeric Analysis")
 
     for col in numeric_cols:
 
-        avg = round(df[col].mean(),2)
+        st.subheader(col)
+
+        avg = df[col].mean()
         mx = df[col].max()
         mn = df[col].min()
 
-        st.subheader(col)
-
         c1,c2,c3 = st.columns(3)
-        c1.metric("Average",avg)
-        c2.metric("Max",mx)
-        c3.metric("Min",mn)
+        c1.metric("Average", round(avg,2))
+        c2.metric("Max", mx)
+        c3.metric("Min", mn)
 
-        fig,ax = plt.subplots()
+        fig, ax = plt.subplots()
         df[col].hist(ax=ax)
 
         st.pyplot(fig)
 
+        insight = histogram_insight(col, avg, mn, mx)
+        st.write("Insight:", insight)
+
+        insights.append(insight)
         charts.append((col,fig))
 
-        insights.append(
-            f"{col} ranges from {mn} to {mx} with an average of {avg}, indicating variability in the dataset."
-        )
-
-        recommendations.append(
-            f"Monitor extreme values in {col} and ensure operational consistency."
-        )
-
-    # -----------------------
+    # --------------------------
     # CATEGORY ANALYSIS
-    # -----------------------
+    # --------------------------
 
     st.header("Category Analysis")
 
@@ -72,37 +130,46 @@ if file:
 
         if df[cat].nunique() <= 20:
 
-            counts = df[cat].value_counts()
-
             st.subheader(cat)
 
-            fig1,ax = plt.subplots()
-            counts.plot(kind="bar",ax=ax)
+            counts = df[cat].value_counts()
+
+            # BAR
+            fig1, ax = plt.subplots()
+            counts.plot(kind="bar", ax=ax)
 
             st.pyplot(fig1)
 
-            fig2,ax = plt.subplots()
-            counts.plot(kind="pie",autopct="%1.1f%%",ax=ax)
+            insight, best, worst = bar_insight(cat, counts)
+
+            st.write("Insight:", insight)
+
+            rec = recommendation(best, worst, cat)
+
+            st.write("Recommendation:", rec)
+
+            insights.append(insight)
+            recommendations.append(rec)
+
+            charts.append((cat+"_bar", fig1))
+
+            # PIE
+            fig2, ax = plt.subplots()
+            counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
 
             st.pyplot(fig2)
 
-            charts.append((cat+"_bar",fig1))
-            charts.append((cat+"_pie",fig2))
+            pie_i = pie_insight(cat, counts)
 
-            best = counts.idxmax()
-            worst = counts.idxmin()
+            st.write("Insight:", pie_i)
 
-            insights.append(
-                f"In column {cat}, '{best}' appears most frequently while '{worst}' appears least frequently, indicating imbalance in category distribution."
-            )
+            insights.append(pie_i)
 
-            recommendations.append(
-                f"Analyse why '{best}' dominates in {cat} and explore strategies to improve '{worst}'."
-            )
+            charts.append((cat+"_pie", fig2))
 
-    # -----------------------
+    # --------------------------
     # CORRELATION
-    # -----------------------
+    # --------------------------
 
     if len(numeric_cols) > 1:
 
@@ -110,105 +177,75 @@ if file:
 
         corr = df[numeric_cols].corr()
 
-        fig,ax = plt.subplots()
+        fig, ax = plt.subplots()
+
         cax = ax.matshow(corr)
 
         st.pyplot(fig)
 
-        charts.append(("correlation",fig))
+        charts.append(("correlation", fig))
 
-        insights.append(
-            "Correlation analysis reveals relationships between numeric variables that may influence each other."
-        )
+        for i in corr.columns:
+            for j in corr.columns:
 
-    # -----------------------
-    # INSIGHTS DISPLAY
-    # -----------------------
+                if i != j and abs(corr.loc[i,j]) > 0.7:
 
-    st.header("Insights")
+                    insight = f"A strong relationship exists between {i} and {j}."
+                    st.write("Insight:", insight)
 
-    for i in insights:
-        st.write("-",i)
+                    insights.append(insight)
 
-    st.header("Recommendations")
+    # --------------------------
+    # FINAL RECOMMENDATIONS
+    # --------------------------
+
+    st.header("Strategic Recommendations")
 
     for r in recommendations:
-        st.write("-",r)
+        st.write("-", r)
 
-    # -----------------------
-    # PPT GENERATOR
-    # -----------------------
+    # --------------------------
+    # PPT GENERATION
+    # --------------------------
 
-    if st.button("Generate Professional PPT"):
+    if st.button("Generate PPT Report"):
 
         prs = Presentation()
 
-        # Title
         slide = prs.slides.add_slide(prs.slide_layouts[0])
         slide.shapes.title.text = "Automated Data Analysis Report"
-        slide.placeholders[1].text = "Generated from Excel Dataset"
-
-        # Numeric summary
-        for col in numeric_cols:
-
-            avg = round(df[col].mean(),2)
-            mx = df[col].max()
-            mn = df[col].min()
-
-            slide = prs.slides.add_slide(prs.slide_layouts[1])
-            slide.shapes.title.text = f"{col} Statistics"
-
-            slide.placeholders[1].text = f"""
-Average: {avg}
-
-Maximum: {mx}
-
-Minimum: {mn}
-"""
-
-        # Category charts
-        for cat in cat_cols:
-
-            if df[cat].nunique() <= 20:
-
-                counts = df[cat].value_counts()
-
-                fig_bar,ax = plt.subplots()
-                counts.plot(kind="bar",ax=ax)
-
-                fig_pie,ax = plt.subplots()
-                counts.plot(kind="pie",autopct="%1.1f%%",ax=ax)
-
-                tmp1 = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
-                tmp2 = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
-
-                fig_bar.savefig(tmp1.name)
-                fig_pie.savefig(tmp2.name)
-
-                slide = prs.slides.add_slide(prs.slide_layouts[5])
-
-                slide.shapes.title.text = cat
-
-                slide.shapes.add_picture(tmp1.name,Inches(0.5),Inches(1.5),height=Inches(4))
-                slide.shapes.add_picture(tmp2.name,Inches(6),Inches(1.5),height=Inches(4))
+        slide.placeholders[1].text = "Generated from Excel dataset"
 
         # Insights slide
         slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = "Key Insights"
-
         slide.placeholders[1].text = "\n".join(insights)
 
-        # Recommendation slide
+        # Recommendations
         slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = "Recommendations"
-
         slide.placeholders[1].text = "\n".join(recommendations)
 
-        ppt = "analysis_report.pptx"
+        # Charts
+        for name, chart in charts:
 
-        prs.save(ppt)
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
 
-        with open(ppt,"rb") as f:
+            chart.savefig(tmp.name)
+
+            slide = prs.slides.add_slide(prs.slide_layouts[5])
+            slide.shapes.title.text = name
+
+            slide.shapes.add_picture(
+                tmp.name,
+                Inches(1),
+                Inches(1.5),
+                height=Inches(4.5)
+            )
+
+        prs.save("analysis_report.pptx")
+
+        with open("analysis_report.pptx","rb") as f:
 
             st.download_button(
                 "Download PPT",
