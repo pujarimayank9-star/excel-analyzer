@@ -3,13 +3,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pptx import Presentation
-from pptx.util import Inches
 
 st.set_page_config(page_title="AI Data Analyst", layout="wide")
 
 st.title("📊 Universal AI Data Analyst")
 
-file = st.file_uploader("Upload Excel File", type=["xlsx","csv"])
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx","csv"])
 
 
 def generate_ppt(insights):
@@ -18,27 +17,27 @@ def generate_ppt(insights):
 
     slide = prs.slides.add_slide(prs.slide_layouts[0])
     slide.shapes.title.text = "AI Data Analysis Report"
-    slide.placeholders[1].text = "Auto generated insights"
+    slide.placeholders[1].text = "Automatically generated analysis"
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Key Insights"
     slide.placeholders[1].text = "\n".join(insights)
 
-    prs.save("report.pptx")
+    prs.save("analysis_report.pptx")
 
 
-if file:
+if uploaded_file:
 
-    if file.name.endswith(".csv"):
-        df = pd.read_csv(file)
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
     else:
-        df = pd.read_excel(file)
+        df = pd.read_excel(uploaded_file)
 
     st.subheader("Dataset Preview")
     st.dataframe(df)
 
-    numeric_cols = df.select_dtypes(include=np.number).columns
-    cat_cols = df.select_dtypes(include="object").columns
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+    cat_cols = df.select_dtypes(include="object").columns.tolist()
 
     insights = []
 
@@ -50,11 +49,13 @@ if file:
     c2.metric("Columns", df.shape[1])
     c3.metric("Numeric Columns", len(numeric_cols))
 
-    # Numeric analysis
+# ----------------------------
+# NUMERIC ANALYSIS
+# ----------------------------
 
     if len(numeric_cols)>0:
 
-        st.subheader("Numeric Analysis")
+        st.header("Numeric Analysis")
 
         for col in numeric_cols:
 
@@ -64,11 +65,11 @@ if file:
 
             c1,c2,c3 = st.columns(3)
 
-            c1.metric(f"{col} Avg", round(avg,2))
+            c1.metric(f"{col} Average", round(avg,2))
             c2.metric(f"{col} Max", mx)
             c3.metric(f"{col} Min", mn)
 
-            insights.append(f"{col} average value is {round(avg,2)}")
+            insights.append(f"{col} average is {round(avg,2)}")
 
             fig, ax = plt.subplots()
 
@@ -78,42 +79,46 @@ if file:
 
             st.pyplot(fig)
 
-            st.write(f"{col} distribution shows how values are spread across dataset.")
+            st.write(f"{col} distribution shows spread of values.")
 
-    # Category vs numeric
+# ----------------------------
+# CATEGORY BASED ANALYSIS
+# ----------------------------
 
     if len(cat_cols)>0 and len(numeric_cols)>0:
 
-        st.subheader("Category Based Analysis")
+        st.header("Category Based Analysis")
 
         for cat in cat_cols:
 
             for num in numeric_cols:
 
-                data = df.groupby(cat)[num].mean()
+                grouped = df.groupby(cat)[num].mean()
 
                 fig, ax = plt.subplots()
 
-                data.plot(kind="bar", ax=ax)
+                grouped.plot(kind="bar", ax=ax)
 
                 ax.set_title(f"{cat} vs {num}")
 
                 st.pyplot(fig)
 
-                best = data.idxmax()
-                worst = data.idxmin()
+                best = grouped.idxmax()
+                worst = grouped.idxmin()
 
                 st.write(f"Best {cat} based on {num}: **{best}**")
                 st.write(f"Worst {cat} based on {num}: **{worst}**")
 
-                insights.append(f"{best} performs best in {cat} based on {num}")
-                insights.append(f"{worst} performs lowest in {cat} based on {num}")
+                insights.append(f"{best} performs best in {cat} for {num}")
+                insights.append(f"{worst} performs worst in {cat} for {num}")
 
-    # Category contribution
+# ----------------------------
+# CATEGORY CONTRIBUTION
+# ----------------------------
 
     if len(cat_cols)>0:
 
-        st.subheader("Category Contribution")
+        st.header("Category Contribution")
 
         for cat in cat_cols:
 
@@ -121,41 +126,21 @@ if file:
 
             fig, ax = plt.subplots()
 
-            counts.plot(kind="pie", ax=ax, autopct="%1.1f%%")
+            counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
 
             ax.set_ylabel("")
 
             st.pyplot(fig)
 
-            insights.append(f"{cat} distribution shows category contribution in dataset")
+            insights.append(f"{cat} distribution analyzed")
 
-    # Scatter relationships
-
-    if len(numeric_cols)>1:
-
-        st.subheader("Numeric Relationships")
-
-        for i in range(len(numeric_cols)-1):
-
-            x = numeric_cols[i]
-            y = numeric_cols[i+1]
-
-            fig, ax = plt.subplots()
-
-            ax.scatter(df[x], df[y])
-
-            ax.set_xlabel(x)
-            ax.set_ylabel(y)
-
-            st.pyplot(fig)
-
-            st.write(f"Relationship between {x} and {y}")
-
-    # Correlation
+# ----------------------------
+# CORRELATION
+# ----------------------------
 
     if len(numeric_cols)>1:
 
-        st.subheader("Correlation Heatmap")
+        st.header("Correlation Heatmap")
 
         corr = df[numeric_cols].corr()
 
@@ -173,50 +158,101 @@ if file:
 
         st.pyplot(fig)
 
-        insights.append("Correlation heatmap shows relationships between numeric variables")
+        insights.append("Correlation between numeric variables analyzed")
 
-    # Date trend
+# ----------------------------
+# RELATIONSHIP SCATTER
+# ----------------------------
+
+    if len(numeric_cols)>1:
+
+        st.header("Numeric Relationships")
+
+        for i in range(len(numeric_cols)-1):
+
+            x = numeric_cols[i]
+            y = numeric_cols[i+1]
+
+            fig, ax = plt.subplots()
+
+            ax.scatter(df[x], df[y])
+
+            ax.set_xlabel(x)
+            ax.set_ylabel(y)
+
+            ax.set_title(f"{x} vs {y}")
+
+            st.pyplot(fig)
+
+# ----------------------------
+# TREND ANALYSIS (SAFE)
+# ----------------------------
+
+    st.header("Trend Analysis")
+
+    date_cols = []
 
     for col in df.columns:
 
-        if "date" in col.lower():
+        try:
 
-            st.subheader("Trend Analysis")
+            converted = pd.to_datetime(df[col], errors="coerce")
 
-            df[col] = pd.to_datetime(df[col])
+            if converted.notna().sum() > len(df)*0.6:
 
-            for num in numeric_cols:
+                date_cols.append(col)
 
-                trend = df.groupby(col)[num].sum()
+        except:
+            pass
 
-                fig, ax = plt.subplots()
+    if len(date_cols)>0:
 
-                trend.plot(ax=ax)
+        date_col = date_cols[0]
 
-                ax.set_title(f"{num} Trend")
+        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
 
-                st.pyplot(fig)
+        df = df.dropna(subset=[date_col])
 
-                insights.append(f"{num} trend over time analyzed")
+        for num in numeric_cols:
 
-    # AI Insights
+            trend = df.groupby(date_col)[num].sum()
 
-    st.subheader("AI Insights")
+            fig, ax = plt.subplots()
+
+            trend.plot(ax=ax)
+
+            ax.set_title(f"{num} Trend Over Time")
+
+            st.pyplot(fig)
+
+            insights.append(f"{num} trend over time analyzed")
+
+    else:
+
+        st.write("No valid date column detected for trend analysis.")
+
+# ----------------------------
+# AI INSIGHTS
+# ----------------------------
+
+    st.header("AI Insights")
 
     for i in insights:
 
         st.write("•", i)
 
-    # PPT
+# ----------------------------
+# PPT GENERATOR
+# ----------------------------
 
     if st.button("Generate PowerPoint Report"):
 
         generate_ppt(insights)
 
-        with open("report.pptx","rb") as f:
+        with open("analysis_report.pptx","rb") as f:
 
             st.download_button(
                 "Download PPT",
                 f,
-                file_name="analysis_report.pptx"
+                file_name="AI_Data_Analysis_Report.pptx"
             )
