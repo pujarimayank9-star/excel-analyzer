@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from pptx import Presentation
 from pptx.util import Inches
 
-st.set_page_config(page_title="Excel Analyzer + PPT Generator", layout="wide")
+st.set_page_config(page_title="Excel Analyzer Pro", layout="wide")
 
-st.title("📊 Excel Data Analyzer + Auto PowerPoint Report")
+st.title("📊 Excel Data Analyzer + PowerPoint Report")
 
-uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+file = st.file_uploader("Upload Excel file", type=["xlsx"])
 
 
 def generate_ppt(df):
@@ -16,92 +16,112 @@ def generate_ppt(df):
     prs = Presentation()
 
     # Title slide
-    slide_layout = prs.slide_layouts[0]
-    slide = prs.slides.add_slide(slide_layout)
-
-    slide.shapes.title.text = "Excel Analysis Report"
-    slide.placeholders[1].text = "Automatically generated"
+    slide = prs.slides.add_slide(prs.slide_layouts[0])
+    slide.shapes.title.text = "Data Analysis Report"
+    slide.placeholders[1].text = "Automatically generated insights"
 
     # Dataset overview
-    slide_layout = prs.slide_layouts[1]
-    slide = prs.slides.add_slide(slide_layout)
-
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Dataset Overview"
 
     overview = f"""
-Total Rows: {df.shape[0]}
-Total Columns: {df.shape[1]}
+Rows: {df.shape[0]}
+Columns: {df.shape[1]}
 """
 
     slide.placeholders[1].text = overview
 
+    # Numeric columns
     numeric_cols = df.select_dtypes(include="number").columns
 
-    if len(numeric_cols) > 0:
+    insights = ""
 
-        col = numeric_cols[0]
+    for col in numeric_cols:
+
+        avg = df[col].mean()
+        mx = df[col].max()
+        mn = df[col].min()
+
+        insights += f"{col} average is {round(avg,2)}. Max value {mx}, Min value {mn}.\n"
 
         plt.figure()
-        df[col].plot(kind="hist")
-        plt.title(f"{col} Distribution")
+        df[col].plot(kind="bar")
+        plt.title(col)
+        chart = f"{col}.png"
+        plt.savefig(chart)
 
-        chart_file = "chart.png"
-        plt.savefig(chart_file)
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        slide.shapes.title.text = f"{col} Analysis"
+        slide.shapes.add_picture(chart, Inches(1), Inches(2), width=Inches(6))
 
-        slide_layout = prs.slide_layouts[5]
-        slide = prs.slides.add_slide(slide_layout)
-
-        slide.shapes.title.text = f"{col} Distribution"
-
-        slide.shapes.add_picture(chart_file, Inches(1), Inches(2), width=Inches(6))
+    # Insights slide
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "Key Insights"
+    slide.placeholders[1].text = insights
 
     prs.save("analysis_report.pptx")
 
 
-if uploaded_file:
+if file:
 
-    df = pd.read_excel(uploaded_file)
+    df = pd.read_excel(file)
 
     st.subheader("Dataset Preview")
     st.dataframe(df)
 
     numeric_cols = df.select_dtypes(include="number").columns
+    cat_cols = df.select_dtypes(include="object").columns
 
     st.subheader("📈 Numeric Analysis")
 
     for col in numeric_cols:
 
-        avg = df[col].mean()
-        max_val = df[col].max()
-        min_val = df[col].min()
-
         c1, c2, c3 = st.columns(3)
 
-        with c1:
-            st.metric(f"Average {col}", round(avg, 2))
+        c1.metric("Average", round(df[col].mean(),2))
+        c2.metric("Max", df[col].max())
+        c3.metric("Min", df[col].min())
 
-        with c2:
-            st.metric(f"Max {col}", max_val)
+        fig, ax = plt.subplots()
+        df[col].plot(kind="bar", ax=ax)
+        st.pyplot(fig)
 
-        with c3:
-            st.metric(f"Min {col}", min_val)
+    if len(cat_cols) > 0 and len(numeric_cols) > 0:
 
-        st.bar_chart(df[col])
+        st.subheader("📊 Category Comparison")
 
-    st.subheader("🔎 Correlation Analysis")
+        cat = cat_cols[0]
+        num = numeric_cols[0]
+
+        comp = df.groupby(cat)[num].sum()
+
+        fig, ax = plt.subplots()
+        comp.plot(kind="bar", ax=ax)
+        st.pyplot(fig)
+
+        best = comp.idxmax()
+        worst = comp.idxmin()
+
+        st.success(f"Best {cat}: {best}")
+        st.warning(f"Lowest {cat}: {worst}")
 
     if len(numeric_cols) > 1:
 
+        st.subheader("🔎 Correlation Analysis")
+
         corr = df[numeric_cols].corr()
+
         st.dataframe(corr)
 
         fig, ax = plt.subplots()
         cax = ax.matshow(corr)
-
-        plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
-        plt.yticks(range(len(corr.columns)), corr.columns)
-
         fig.colorbar(cax)
+
+        ax.set_xticks(range(len(corr.columns)))
+        ax.set_xticklabels(corr.columns, rotation=90)
+
+        ax.set_yticks(range(len(corr.columns)))
+        ax.set_yticklabels(corr.columns)
 
         st.pyplot(fig)
 
@@ -124,7 +144,8 @@ if uploaded_file:
 
         generate_ppt(df)
 
-        with open("analysis_report.pptx", "rb") as f:
+        with open("analysis_report.pptx","rb") as f:
+
             st.download_button(
                 "Download PPT Report",
                 f,
