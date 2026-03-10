@@ -1,23 +1,24 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 from pptx import Presentation
 from pptx.util import Inches
 
-st.set_page_config(page_title="AI Data Analyst", layout="wide")
+st.set_page_config(page_title="Universal Excel AI Analyzer", layout="wide")
 
-st.title("🤖 AI Data Analyst + Auto Presentation Generator")
+st.title("🤖 Universal Excel AI Data Analyst")
 
-uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+file = st.file_uploader("Upload Excel File", type=["xlsx"])
+
 
 def generate_ppt(df, insights):
 
     prs = Presentation()
 
     slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = "AI Data Analysis Report"
-    slide.placeholders[1].text = "Automatically generated"
+    slide.shapes.title.text = "Excel Data Analysis Report"
+    slide.placeholders[1].text = "Auto generated AI analysis"
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Dataset Overview"
@@ -30,15 +31,16 @@ Columns: {cols}
 """
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "AI Insights"
+    slide.shapes.title.text = "Insights"
+
     slide.placeholders[1].text = "\n".join(insights)
 
     prs.save("report.pptx")
 
 
-if uploaded_file:
+if file:
 
-    df = pd.read_excel(uploaded_file)
+    df = pd.read_excel(file)
 
     st.subheader("Dataset Preview")
     st.dataframe(df)
@@ -50,7 +52,7 @@ if uploaded_file:
 
     st.subheader("Dataset Summary")
 
-    c1,c2,c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
     c1.metric("Rows", rows)
     c2.metric("Columns", cols)
@@ -58,56 +60,100 @@ if uploaded_file:
 
     insights = []
 
+    # numeric metrics
+
     if len(numeric_cols) > 0:
 
         st.subheader("Numeric Metrics")
 
-        col = numeric_cols[0]
+        for col in numeric_cols:
 
-        c1,c2,c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
 
-        c1.metric("Average", round(df[col].mean(),2))
-        c2.metric("Max", df[col].max())
-        c3.metric("Min", df[col].min())
+            c1.metric(f"{col} Avg", round(df[col].mean(),2))
+            c2.metric(f"{col} Max", df[col].max())
+            c3.metric(f"{col} Min", df[col].min())
 
-        insights.append(f"Average {col} is {round(df[col].mean(),2)}")
+            insights.append(f"{col} average is {round(df[col].mean(),2)}")
 
-    # Distribution charts
+    # histograms
 
-    st.subheader("Distribution Analysis")
+    if len(numeric_cols) > 0:
 
-    for col in numeric_cols:
+        st.subheader("Distribution Charts")
 
-        fig, ax = plt.subplots()
+        for col in numeric_cols:
 
-        df[col].plot(kind="hist", ax=ax)
+            fig, ax = plt.subplots()
 
-        ax.set_title(f"{col} Distribution")
+            df[col].plot(kind="hist", ax=ax)
 
-        st.pyplot(fig)
+            ax.set_title(f"{col} Distribution")
 
-    # Category vs numeric
+            st.pyplot(fig)
+
+    # box plots
+
+    if len(numeric_cols) > 0:
+
+        st.subheader("Box Plots")
+
+        for col in numeric_cols:
+
+            fig, ax = plt.subplots()
+
+            df.boxplot(column=col, ax=ax)
+
+            ax.set_title(f"{col} Box Plot")
+
+            st.pyplot(fig)
+
+    # category vs numeric
 
     if len(cat_cols) > 0 and len(numeric_cols) > 0:
 
-        st.subheader("Category Comparison")
+        st.subheader("Category Comparisons")
 
-        cat = cat_cols[0]
-        num = numeric_cols[0]
+        for cat in cat_cols:
 
-        data = df.groupby(cat)[num].mean()
+            for num in numeric_cols:
 
-        fig, ax = plt.subplots()
+                try:
 
-        data.plot(kind="bar", ax=ax)
+                    data = df.groupby(cat)[num].mean()
 
-        ax.set_title(f"{num} by {cat}")
+                    fig, ax = plt.subplots()
 
-        st.pyplot(fig)
+                    data.plot(kind="bar", ax=ax)
 
-        insights.append(f"{data.idxmax()} has highest {num}")
+                    ax.set_title(f"{num} by {cat}")
 
-    # Correlation
+                    st.pyplot(fig)
+
+                except:
+                    pass
+
+    # scatter plots
+
+    if len(numeric_cols) > 1:
+
+        st.subheader("Scatter Relationships")
+
+        for i in range(len(numeric_cols)-1):
+
+            x = numeric_cols[i]
+            y = numeric_cols[i+1]
+
+            fig, ax = plt.subplots()
+
+            ax.scatter(df[x], df[y])
+
+            ax.set_xlabel(x)
+            ax.set_ylabel(y)
+
+            st.pyplot(fig)
+
+    # correlation
 
     if len(numeric_cols) > 1:
 
@@ -129,27 +175,6 @@ if uploaded_file:
 
         st.pyplot(fig)
 
-    # Trend analysis
-
-    date_cols = df.select_dtypes(include=["datetime"]).columns
-
-    if len(date_cols) > 0 and len(numeric_cols) > 0:
-
-        st.subheader("Trend Analysis")
-
-        date = date_cols[0]
-        num = numeric_cols[0]
-
-        df = df.sort_values(date)
-
-        fig, ax = plt.subplots()
-
-        ax.plot(df[date], df[num])
-
-        st.pyplot(fig)
-
-        insights.append(f"{num} trend analyzed over time")
-
     # AI insights
 
     st.subheader("AI Insights")
@@ -158,15 +183,13 @@ if uploaded_file:
 
         st.write("•", i)
 
-    # Recommendations
+    # recommendations
 
-    st.subheader("Business Recommendations")
+    st.subheader("Recommendations")
 
-    if len(numeric_cols) > 0:
-
-        st.write("• Focus on improving lower performing segments")
-        st.write("• Investigate factors influencing top values")
-        st.write("• Monitor trends regularly")
+    st.write("• Investigate high and low values in dataset")
+    st.write("• Monitor correlations between variables")
+    st.write("• Focus on improving weak segments")
 
     # PPT
 
@@ -177,7 +200,7 @@ if uploaded_file:
         with open("report.pptx","rb") as f:
 
             st.download_button(
-                "Download PPT",
+                "Download PPT Report",
                 f,
-                file_name="AI_Data_Report.pptx"
+                file_name="data_analysis_report.pptx"
             )
