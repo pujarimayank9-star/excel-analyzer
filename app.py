@@ -19,9 +19,9 @@ if file:
     st.header("Dataset Preview")
     st.dataframe(df)
 
-# -------------------
+# -----------------------
 # COLUMN DETECTION
-# -------------------
+# -----------------------
 
     date_col = None
     numeric_cols = []
@@ -29,7 +29,6 @@ if file:
 
     for col in df.columns:
 
-        # try date
         parsed = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
 
         if parsed.notna().sum() > len(df)*0.6:
@@ -37,7 +36,6 @@ if file:
             date_col = col
             continue
 
-        # try numeric
         converted = pd.to_numeric(df[col], errors="coerce")
 
         if converted.notna().sum() > len(df)*0.6:
@@ -47,48 +45,57 @@ if file:
         else:
             cat_cols.append(col)
 
-# -------------------
+# -----------------------
+# CHECK TARGET
+# -----------------------
+
+    if not numeric_cols:
+
+        st.error("No numeric column detected for analysis.")
+        st.stop()
+
+    target = numeric_cols[0]
+
+# -----------------------
 # BASIC STATS
-# -------------------
+# -----------------------
 
     st.header("Basic Statistics")
 
-    for col in numeric_cols:
+    avg = df[target].mean()
+    mx = df[target].max()
+    mn = df[target].min()
 
-        c1,c2,c3 = st.columns(3)
+    c1,c2,c3 = st.columns(3)
 
-        c1.metric("Average", round(df[col].mean(),2))
-        c2.metric("Max", df[col].max())
-        c3.metric("Min", df[col].min())
+    c1.metric("Average", round(avg,2))
+    c2.metric("Max", mx)
+    c3.metric("Min", mn)
 
-# -------------------
+# -----------------------
 # DRIVER ANALYSIS
-# -------------------
+# -----------------------
 
     st.header("Revenue Driver Analysis")
 
-    if numeric_cols and cat_cols:
+    driver_scores = {}
 
-        target = numeric_cols[0]
+    for cat in cat_cols:
 
-        driver_scores = {}
-
-        for cat in cat_cols:
+        if df[cat].nunique() < 20:
 
             variation = df.groupby(cat)[target].mean().std()
 
             driver_scores[cat] = variation
 
-        sorted_drivers = sorted(driver_scores.items(), key=lambda x:x[1], reverse=True)
+    sorted_drivers = sorted(driver_scores.items(), key=lambda x:x[1], reverse=True)
 
-        st.write("Top drivers of variation:")
+    for d in sorted_drivers:
+        st.write("Driver:", d[0])
 
-        for d in sorted_drivers:
-            st.write(d[0])
-
-# -------------------
-# CATEGORY ANALYSIS
-# -------------------
+# -----------------------
+# SEGMENT ANALYSIS
+# -----------------------
 
     st.header("Segment Analysis")
 
@@ -110,16 +117,16 @@ if file:
             best = grp.idxmax()
             worst = grp.idxmin()
 
-            insights.append(f"{best} segment leads performance in {cat}")
-            insights.append(f"{worst} segment shows lowest sales in {cat}")
+            insights.append(f"{best} performs best in {cat}")
+            insights.append(f"{worst} performs weakest in {cat}")
 
             suggestions.append(
-                f"Improving performance of {worst} segment in {cat} could significantly increase revenue."
+                f"Improving {worst} segment performance in {cat} could increase revenue."
             )
 
-# -------------------
+# -----------------------
 # CROSS ANALYSIS
-# -------------------
+# -----------------------
 
     if len(cat_cols) >= 2:
 
@@ -132,9 +139,9 @@ if file:
 
         st.dataframe(pivot)
 
-# -------------------
+# -----------------------
 # TREND ANALYSIS
-# -------------------
+# -----------------------
 
     if date_col:
 
@@ -172,28 +179,18 @@ if file:
 
         st.pyplot(fig)
 
-        df["weekday"] = df[date_col].dt.day_name()
-
-        season = df.groupby("weekday")[target].mean()
-
-        fig,ax = plt.subplots()
-
-        season.plot(kind="bar", ax=ax)
-
-        st.pyplot(fig)
-
-# -------------------
+# -----------------------
 # INSIGHTS
-# -------------------
+# -----------------------
 
     st.header("Business Insights")
 
     for i in insights:
         st.write("•",i)
 
-# -------------------
+# -----------------------
 # SUGGESTIONS
-# -------------------
+# -----------------------
 
     st.header("Strategic Suggestions")
 
