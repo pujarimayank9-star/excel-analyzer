@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,10 +16,7 @@ file = st.file_uploader("Upload Excel / CSV", type=["xlsx","csv"])
 
 if file:
 
-    # --------------------------
     # LOAD DATA
-    # --------------------------
-
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
     else:
@@ -35,36 +34,28 @@ if file:
     charts = []
 
     # --------------------------
-    # HISTOGRAM INSIGHT
+    # INSIGHT FUNCTIONS
     # --------------------------
 
     def histogram_insight(col, avg, mn, mx):
         templates = [
-            f"{col} ranges from {mn} to {mx} with an average of {round(avg,2)} indicating variability.",
-            f"The distribution of {col} spans between {mn} and {mx} with mean around {round(avg,2)}.",
-            f"{col} values vary from {mn} to {mx} suggesting moderate spread."
+            f"{col} ranges from {mn} to {mx} with an average of {round(avg,2)}, showing the spread of values in the dataset.",
+            f"The distribution of {col} varies between {mn} and {mx} with mean around {round(avg,2)}.",
+            f"{col} values fluctuate between {mn} and {mx}, suggesting moderate variability."
         ]
         return random.choice(templates)
-
-    # --------------------------
-    # BAR INSIGHT
-    # --------------------------
 
     def bar_insight(col, data):
         best = data.idxmax()
         worst = data.idxmin()
 
         templates = [
-            f"{best} shows the highest value in {col} while {worst} records the lowest.",
-            f"In {col}, {best} leads performance whereas {worst} appears weakest.",
-            f"{best} dominates the {col} comparison while {worst} contributes least."
+            f"In {col}, {best} records the highest value while {worst} appears the lowest.",
+            f"{best} leads the {col} comparison whereas {worst} contributes the least.",
+            f"{best} dominates {col} while {worst} has the smallest presence."
         ]
 
         return random.choice(templates), best, worst
-
-    # --------------------------
-    # PIE INSIGHT
-    # --------------------------
 
     def pie_insight(col, counts):
         top = counts.idxmax()
@@ -72,21 +63,17 @@ if file:
 
         templates = [
             f"{top} represents the largest share in {col} contributing about {percent}%.",
-            f"{top} dominates the {col} distribution with roughly {percent}% share.",
-            f"{top} accounts for the highest portion of {col}."
+            f"{top} dominates the distribution of {col} with roughly {percent}% share.",
+            f"{top} accounts for the highest proportion of {col}."
         ]
 
         return random.choice(templates)
 
-    # --------------------------
-    # RECOMMENDATION
-    # --------------------------
-
     def recommendation(best, worst, col):
         templates = [
-            f"Investigate why {best} performs better in {col} and replicate its strategy.",
-            f"Focus on improving performance of {worst} within {col}.",
-            f"Strategies used by {best} could help improve other segments in {col}."
+            f"Investigate why {best} performs strongly in {col} and replicate similar strategies.",
+            f"Focus on improving the performance of {worst} within {col}.",
+            f"Practices used by {best} could help improve other segments in {col}."
         ]
         return random.choice(templates)
 
@@ -115,9 +102,11 @@ if file:
         st.pyplot(fig)
 
         insight = histogram_insight(col, avg, mn, mx)
+
         st.write("Insight:", insight)
 
         insights.append(insight)
+
         charts.append((col,fig))
 
     # --------------------------
@@ -134,7 +123,7 @@ if file:
 
             counts = df[cat].value_counts()
 
-            # BAR
+            # BAR CHART
             fig1, ax = plt.subplots()
             counts.plot(kind="bar", ax=ax)
 
@@ -153,7 +142,7 @@ if file:
 
             charts.append((cat+"_bar", fig1))
 
-            # PIE
+            # PIE CHART
             fig2, ax = plt.subplots()
             counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
 
@@ -168,7 +157,7 @@ if file:
             charts.append((cat+"_pie", fig2))
 
     # --------------------------
-    # CORRELATION
+    # CORRELATION ANALYSIS
     # --------------------------
 
     if len(numeric_cols) > 1:
@@ -177,32 +166,54 @@ if file:
 
         corr = df[numeric_cols].corr()
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(6,5))
 
-        cax = ax.matshow(corr)
+        cax = ax.imshow(corr, cmap="coolwarm")
+
+        ax.set_xticks(range(len(corr.columns)))
+        ax.set_yticks(range(len(corr.columns)))
+
+        ax.set_xticklabels(corr.columns, rotation=45)
+        ax.set_yticklabels(corr.columns)
+
+        plt.colorbar(cax)
+
+        for i in range(len(corr.columns)):
+            for j in range(len(corr.columns)):
+                ax.text(j, i, round(corr.iloc[i,j],2),
+                        ha="center", va="center", color="black")
 
         st.pyplot(fig)
 
         charts.append(("correlation", fig))
 
-        for i in corr.columns:
-            for j in corr.columns:
+        st.subheader("Correlation Insights")
 
-                if i != j and abs(corr.loc[i,j]) > 0.7:
+        for i in range(len(corr.columns)):
+            for j in range(i+1, len(corr.columns)):
 
-                    insight = f"A strong relationship exists between {i} and {j}."
-                    st.write("Insight:", insight)
+                col1 = corr.columns[i]
+                col2 = corr.columns[j]
+                value = corr.iloc[i,j]
 
-                    insights.append(insight)
+                if value > 0.7:
 
-    # --------------------------
-    # FINAL RECOMMENDATIONS
-    # --------------------------
+                    insight = f"There is a strong positive relationship between {col1} and {col2} (correlation {round(value,2)}). When {col1} increases, {col2} also tends to increase."
 
-    st.header("Strategic Recommendations")
+                elif value > 0.4:
 
-    for r in recommendations:
-        st.write("-", r)
+                    insight = f"{col1} and {col2} show a moderate relationship ({round(value,2)}), indicating some connection between these variables."
+
+                elif value < -0.7:
+
+                    insight = f"{col1} and {col2} have a strong negative relationship ({round(value,2)}). When {col1} increases, {col2} tends to decrease."
+
+                else:
+                    continue
+
+                st.write("Insight:", insight)
+
+                insights.append(insight)
 
     # --------------------------
     # PPT GENERATION
@@ -214,34 +225,71 @@ if file:
 
         slide = prs.slides.add_slide(prs.slide_layouts[0])
         slide.shapes.title.text = "Automated Data Analysis Report"
-        slide.placeholders[1].text = "Generated from Excel dataset"
+        slide.placeholders[1].text = "Generated from Excel Dataset"
 
-        # Insights slide
-        slide = prs.slides.add_slide(prs.slide_layouts[1])
-        slide.shapes.title.text = "Key Insights"
-        slide.placeholders[1].text = "\n".join(insights)
+        i = 0
 
-        # Recommendations
-        slide = prs.slides.add_slide(prs.slide_layouts[1])
-        slide.shapes.title.text = "Recommendations"
-        slide.placeholders[1].text = "\n".join(recommendations)
+        while i < len(charts):
 
-        # Charts
-        for name, chart in charts:
+            name, chart1 = charts[i]
 
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            tmp1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            chart1.savefig(tmp1.name)
 
-            chart.savefig(tmp.name)
+            chart2 = None
+
+            if i+1 < len(charts) and "pie" in charts[i+1][0]:
+                chart2 = charts[i+1][1]
 
             slide = prs.slides.add_slide(prs.slide_layouts[5])
-            slide.shapes.title.text = name
+            slide.shapes.title.text = name.replace("_bar","").replace("_pie","")
 
             slide.shapes.add_picture(
-                tmp.name,
-                Inches(1),
+                tmp1.name,
+                Inches(0.5),
                 Inches(1.5),
-                height=Inches(4.5)
+                height=Inches(3)
             )
+
+            if chart2:
+
+                tmp2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                chart2.savefig(tmp2.name)
+
+                slide.shapes.add_picture(
+                    tmp2.name,
+                    Inches(5),
+                    Inches(1.5),
+                    height=Inches(3)
+                )
+
+                i += 1
+
+            if i < len(insights):
+
+                textbox = slide.shapes.add_textbox(
+                    Inches(0.5),
+                    Inches(4.8),
+                    Inches(9),
+                    Inches(1)
+                )
+
+                tf = textbox.text_frame
+                tf.text = "Insight: " + insights[i]
+
+            if i < len(recommendations):
+
+                textbox2 = slide.shapes.add_textbox(
+                    Inches(0.5),
+                    Inches(5.6),
+                    Inches(9),
+                    Inches(1)
+                )
+
+                tf2 = textbox2.text_frame
+                tf2.text = "Recommendation: " + recommendations[i]
+
+            i += 1
 
         prs.save("analysis_report.pptx")
 
