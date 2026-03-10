@@ -7,19 +7,21 @@ from pptx.util import Inches
 
 st.set_page_config(page_title="Universal Excel AI Analyzer", layout="wide")
 
-st.title("🤖 Universal Excel AI Data Analyst")
+st.title("🤖 AI Data Analyst + Auto PPT Generator")
 
-file = st.file_uploader("Upload Excel File", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 
-def generate_ppt(df, insights):
+def generate_ppt(df, insights, numeric_cols):
 
     prs = Presentation()
 
+    # Title slide
     slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = "Excel Data Analysis Report"
-    slide.placeholders[1].text = "Auto generated AI analysis"
+    slide.shapes.title.text = "AI Data Analysis Report"
+    slide.placeholders[1].text = "Automatically generated report"
 
+    # Dataset overview
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Dataset Overview"
 
@@ -28,19 +30,61 @@ def generate_ppt(df, insights):
     slide.placeholders[1].text = f"""
 Rows: {rows}
 Columns: {cols}
+Numeric Columns: {len(numeric_cols)}
 """
 
+    chart_images = []
+
+    # Create charts
+    for col in numeric_cols[:3]:
+
+        fig, ax = plt.subplots()
+
+        df[col].plot(kind="hist", ax=ax)
+
+        ax.set_title(f"{col} Distribution")
+
+        img_name = f"{col}_chart.png"
+
+        plt.savefig(img_name)
+
+        chart_images.append(img_name)
+
+        plt.close()
+
+    # Add chart slides
+    for img in chart_images:
+
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+
+        slide.shapes.title.text = "Data Chart"
+
+        slide.shapes.add_picture(img, Inches(1), Inches(1.5), width=Inches(6))
+
+    # Insights slide
     slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "Insights"
+
+    slide.shapes.title.text = "Key Insights"
 
     slide.placeholders[1].text = "\n".join(insights)
+
+    # Recommendations slide
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+
+    slide.shapes.title.text = "Recommendations"
+
+    slide.placeholders[1].text = """
+Investigate high and low values
+Monitor relationships between variables
+Focus on improving weak segments
+"""
 
     prs.save("report.pptx")
 
 
-if file:
+if uploaded_file:
 
-    df = pd.read_excel(file)
+    df = pd.read_excel(uploaded_file)
 
     st.subheader("Dataset Preview")
     st.dataframe(df)
@@ -60,8 +104,7 @@ if file:
 
     insights = []
 
-    # numeric metrics
-
+    # Numeric metrics
     if len(numeric_cols) > 0:
 
         st.subheader("Numeric Metrics")
@@ -76,8 +119,7 @@ if file:
 
             insights.append(f"{col} average is {round(df[col].mean(),2)}")
 
-    # histograms
-
+    # Distribution charts
     if len(numeric_cols) > 0:
 
         st.subheader("Distribution Charts")
@@ -92,69 +134,27 @@ if file:
 
             st.pyplot(fig)
 
-    # box plots
-
-    if len(numeric_cols) > 0:
-
-        st.subheader("Box Plots")
-
-        for col in numeric_cols:
-
-            fig, ax = plt.subplots()
-
-            df.boxplot(column=col, ax=ax)
-
-            ax.set_title(f"{col} Box Plot")
-
-            st.pyplot(fig)
-
-    # category vs numeric
-
+    # Category comparisons
     if len(cat_cols) > 0 and len(numeric_cols) > 0:
 
-        st.subheader("Category Comparisons")
+        st.subheader("Category Comparison")
 
-        for cat in cat_cols:
+        cat = cat_cols[0]
+        num = numeric_cols[0]
 
-            for num in numeric_cols:
+        data = df.groupby(cat)[num].mean()
 
-                try:
+        fig, ax = plt.subplots()
 
-                    data = df.groupby(cat)[num].mean()
+        data.plot(kind="bar", ax=ax)
 
-                    fig, ax = plt.subplots()
+        ax.set_title(f"{num} by {cat}")
 
-                    data.plot(kind="bar", ax=ax)
+        st.pyplot(fig)
 
-                    ax.set_title(f"{num} by {cat}")
+        insights.append(f"{data.idxmax()} has highest {num}")
 
-                    st.pyplot(fig)
-
-                except:
-                    pass
-
-    # scatter plots
-
-    if len(numeric_cols) > 1:
-
-        st.subheader("Scatter Relationships")
-
-        for i in range(len(numeric_cols)-1):
-
-            x = numeric_cols[i]
-            y = numeric_cols[i+1]
-
-            fig, ax = plt.subplots()
-
-            ax.scatter(df[x], df[y])
-
-            ax.set_xlabel(x)
-            ax.set_ylabel(y)
-
-            st.pyplot(fig)
-
-    # correlation
-
+    # Correlation heatmap
     if len(numeric_cols) > 1:
 
         st.subheader("Correlation Heatmap")
@@ -176,26 +176,15 @@ if file:
         st.pyplot(fig)
 
     # AI insights
-
     st.subheader("AI Insights")
 
     for i in insights:
-
         st.write("•", i)
 
-    # recommendations
-
-    st.subheader("Recommendations")
-
-    st.write("• Investigate high and low values in dataset")
-    st.write("• Monitor correlations between variables")
-    st.write("• Focus on improving weak segments")
-
-    # PPT
-
+    # Generate PPT
     if st.button("Generate PowerPoint Report"):
 
-        generate_ppt(df, insights)
+        generate_ppt(df, insights, numeric_cols)
 
         with open("report.pptx","rb") as f:
 
