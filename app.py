@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.dml.color import RGBColor
+from pptx.util import Inches
 import tempfile
 
 st.set_page_config(page_title="AI Data Analyst", layout="wide")
 
-st.title("AI Data Analyst + Smart Report Generator")
+st.title("AI Data Analyst & Auto Presentation Generator")
 
 file = st.file_uploader("Upload Excel / CSV", type=["xlsx","csv"])
 
@@ -32,12 +31,15 @@ if file:
 
     target = numeric_cols[0]
 
+    # ----------------------
     # BASIC STATS
-    st.header("Basic Statistics")
+    # ----------------------
 
     avg = round(df[target].mean(),2)
     mx = df[target].max()
     mn = df[target].min()
+
+    st.header("Key Statistics")
 
     c1,c2,c3 = st.columns(3)
 
@@ -45,19 +47,38 @@ if file:
     c2.metric("Max",mx)
     c3.metric("Min",mn)
 
-    # HISTOGRAM
-    st.header("Distribution")
+    # ----------------------
+    # TREND ANALYSIS
+    # ----------------------
 
-    fig_hist, ax = plt.subplots()
-    df[target].hist(ax=ax)
+    date_cols = df.select_dtypes(include=["datetime64","object"]).columns
 
-    st.pyplot(fig_hist)
+    trend_chart = None
+
+    for col in date_cols:
+        try:
+            df[col] = pd.to_datetime(df[col])
+            trend = df.groupby(col)[target].sum()
+
+            fig,ax = plt.subplots()
+            trend.plot(ax=ax)
+
+            st.header("Trend Analysis")
+            st.pyplot(fig)
+
+            trend_chart = fig
+            break
+
+        except:
+            continue
+
+    # ----------------------
+    # CATEGORY ANALYSIS
+    # ----------------------
 
     charts = []
     insights = []
-
-    # CATEGORY ANALYSIS
-    st.header("Category Analysis")
+    recommendations = []
 
     for col in cat_cols:
 
@@ -65,116 +86,89 @@ if file:
 
             grp = df.groupby(col)[target].mean()
 
-            fig, ax = plt.subplots()
-            grp.plot(kind="bar", ax=ax)
-
-            ax.set_title(f"{target} by {col}")
-
-            st.pyplot(fig)
-
-            charts.append((fig,f"{target} by {col}"))
-
             best = grp.idxmax()
             worst = grp.idxmin()
 
             best_val = round(grp.max(),2)
             worst_val = round(grp.min(),2)
 
-            explanation = f"""
-Analysis for {col}:
+            # BAR
+            fig_bar,ax = plt.subplots()
+            grp.plot(kind="bar",ax=ax)
+            ax.set_title(f"{target} by {col}")
+            st.pyplot(fig_bar)
 
-• {best} performs the best with an average value of {best_val}.
-This indicates stronger performance compared to other {col} categories.
+            # PIE
+            fig_pie,ax = plt.subplots()
+            grp.plot(kind="pie",autopct="%1.1f%%",ax=ax)
+            ax.set_ylabel("")
+            ax.set_title(f"{col} Distribution")
+            st.pyplot(fig_pie)
 
-• {worst} shows the lowest value of {worst_val}, suggesting weaker contribution.
+            charts.append((col,fig_bar,fig_pie))
 
-Possible reasons:
-- market demand difference
-- operational efficiency
-- customer preference variation
+            insight = f"""
+{best} performs best in {col} with an average value of {best_val}.
+This indicates stronger operational performance or customer demand.
 
-Recommendation:
-Focus on replicating strategies from {best} while improving operations or marketing in {worst}.
+{worst} records the lowest value of {worst_val}.
+This suggests weaker performance compared to peers.
 """
 
-            insights.append(explanation)
+            insights.append((col,insight))
 
-    # PIE CHARTS
-    st.header("Category Distribution")
+            recommendations.append(
+                f"Improve {worst} performance in {col} by adopting strategies from {best}."
+            )
 
-    for col in cat_cols:
+    # ----------------------
+    # CORRELATION
+    # ----------------------
 
-        if df[col].nunique() < 10:
+    if len(numeric_cols) > 1:
 
-            counts = df[col].value_counts()
+        st.header("Correlation Analysis")
 
-            fig, ax = plt.subplots()
-            counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
+        corr = df[numeric_cols].corr()
 
-            ax.set_title(col)
-            ax.set_ylabel("")
+        fig,ax = plt.subplots()
+        cax = ax.matshow(corr)
 
-            st.pyplot(fig)
+        st.pyplot(fig)
 
-            charts.append((fig,f"{col} Distribution"))
+    # ----------------------
+    # POWERPOINT GENERATION
+    # ----------------------
 
-    # SMART INSIGHTS
-    st.header("Smart Business Insights")
-
-    st.write(f"Average {target} across dataset is **{avg}**")
-
-    for i in insights:
-        st.write(i)
-
-    # --------------------------
-    # POWERPOINT GENERATOR
-    # --------------------------
-
-    if st.button("Generate Professional PowerPoint"):
+    if st.button("Generate Professional PPT Report"):
 
         prs = Presentation()
 
-        # TITLE SLIDE
-        slide_layout = prs.slide_layouts[0]
-        slide = prs.slides.add_slide(slide_layout)
+        # TITLE
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        slide.shapes.title.text = "Sales Data Analysis"
+        slide.placeholders[1].text = "Automated Business Intelligence Report"
 
-        slide.shapes.title.text = "Business Data Analysis Report"
-        subtitle = slide.placeholders[1]
-        subtitle.text = "Auto Generated by AI Analyst"
-
-        # STATS SLIDE
+        # STATS
         slide = prs.slides.add_slide(prs.slide_layouts[1])
-
         slide.shapes.title.text = "Key Statistics"
 
-        text = f"""
-Average Value : {avg}
+        slide.placeholders[1].text = f"""
+Average Weekly Sales : {avg}
 
-Maximum Value : {mx}
+Maximum Weekly Sales : {mx}
 
-Minimum Value : {mn}
+Minimum Weekly Sales : {mn}
 """
 
-        slide.placeholders[1].text = text
-
-        # INSIGHTS SLIDES
-        for insight in insights:
-
-            slide = prs.slides.add_slide(prs.slide_layouts[1])
-
-            slide.shapes.title.text = "Business Insight"
-
-            slide.placeholders[1].text = insight
-
-        # CHART SLIDES
-        for fig,title in charts:
+        # TREND
+        if trend_chart:
 
             tmp = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
-            fig.savefig(tmp.name)
+            trend_chart.savefig(tmp.name)
 
             slide = prs.slides.add_slide(prs.slide_layouts[5])
-
-            slide.shapes.title.text = title
+            slide.shapes.title.text = "Trend Analysis"
 
             slide.shapes.add_picture(
                 tmp.name,
@@ -183,13 +177,42 @@ Minimum Value : {mn}
                 height=Inches(4.5)
             )
 
+        # CATEGORY CHARTS
+        for col,bar,pie in charts:
+
+            tmp1 = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
+            bar.savefig(tmp1.name)
+
+            tmp2 = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
+            pie.savefig(tmp2.name)
+
+            slide = prs.slides.add_slide(prs.slide_layouts[5])
+            slide.shapes.title.text = f"{target} by {col}"
+
+            slide.shapes.add_picture(tmp1.name,Inches(0.5),Inches(1.5),height=Inches(4))
+            slide.shapes.add_picture(tmp2.name,Inches(6),Inches(1.5),height=Inches(4))
+
+        # INSIGHTS
+        for col,text in insights:
+
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = f"{col} Insights"
+            slide.placeholders[1].text = text
+
+        # RECOMMENDATIONS
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Strategic Recommendations"
+
+        slide.placeholders[1].text = "\n".join(recommendations)
+
         ppt_path = "analysis_report.pptx"
+
         prs.save(ppt_path)
 
         with open(ppt_path,"rb") as f:
 
             st.download_button(
-                "Download PowerPoint Report",
+                "Download PPT Report",
                 f,
                 file_name="business_analysis_report.pptx"
             )
