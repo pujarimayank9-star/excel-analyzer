@@ -4,20 +4,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pptx import Presentation
 
-st.set_page_config(page_title="AI Data Analyst", layout="wide")
+st.set_page_config(page_title="AI Business Analyst", layout="wide")
 
-st.title("AI Data Analyst + Strategy Engine")
+st.title("AI Business Analyst")
 
-file = st.file_uploader("Upload Excel File", type=["xlsx","csv"])
+file = st.file_uploader("Upload Excel file", type=["xlsx","csv"])
 
 
-def generate_ppt(insights, suggestions):
+def generate_ppt(insights,suggestions):
 
     prs = Presentation()
 
     slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = "AI Data Analysis Report"
-    slide.placeholders[1].text = "Auto generated business analysis"
+    slide.shapes.title.text = "AI Business Analysis"
+    slide.placeholders[1].text = "Automated business intelligence report"
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Key Insights"
@@ -27,7 +27,7 @@ def generate_ppt(insights, suggestions):
     slide.shapes.title.text = "Strategic Recommendations"
     slide.placeholders[1].text = "\n".join(suggestions)
 
-    prs.save("analysis_report.pptx")
+    prs.save("business_report.pptx")
 
 
 if file:
@@ -37,8 +37,12 @@ if file:
     else:
         df = pd.read_excel(file)
 
-    st.subheader("Dataset Preview")
+    st.header("Dataset Preview")
     st.dataframe(df)
+
+# -------------------------
+# COLUMN TYPES
+# -------------------------
 
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(include="object").columns.tolist()
@@ -47,78 +51,88 @@ if file:
     suggestions = []
 
 # -------------------------
-# DATASET OVERVIEW
+# DATE DETECTION
 # -------------------------
 
-    st.header("Dataset Overview")
+    date_col = None
 
-    c1,c2,c3 = st.columns(3)
+    for col in df.columns:
 
-    c1.metric("Rows", df.shape[0])
-    c2.metric("Columns", df.shape[1])
-    c3.metric("Numeric Columns", len(numeric_cols))
+        try:
+            temp = pd.to_datetime(df[col],dayfirst=True)
+            if temp.notna().sum() > len(df)*0.6:
+                df[col] = temp
+                date_col = col
+                break
+        except:
+            pass
 
 # -------------------------
-# NUMERIC ANALYSIS
+# BASIC STATS
 # -------------------------
 
-    st.header("Numeric Analysis")
+    st.header("Basic Statistics")
 
     for col in numeric_cols:
 
-        avg = df[col].mean()
-        mx = df[col].max()
-        mn = df[col].min()
+        st.subheader(col)
 
         c1,c2,c3 = st.columns(3)
 
-        c1.metric(f"{col} Avg", round(avg,2))
-        c2.metric(f"{col} Max", mx)
-        c3.metric(f"{col} Min", mn)
+        c1.metric("Average", round(df[col].mean(),2))
+        c2.metric("Max", df[col].max())
+        c3.metric("Min", df[col].min())
 
-        fig, ax = plt.subplots()
+        fig,ax = plt.subplots()
 
-        df[col].plot(kind="hist", ax=ax)
-
-        ax.set_title(f"{col} Distribution")
+        df[col].plot(kind="hist",ax=ax)
 
         st.pyplot(fig)
 
-        insights.append(f"{col} average value is {round(avg,2)}")
+        insights.append(f"{col} average value is {round(df[col].mean(),2)}")
 
 # -------------------------
 # CATEGORY ANALYSIS
 # -------------------------
 
-    st.header("Category Performance")
+    st.header("Category Analysis")
 
     for cat in cat_cols:
 
         for num in numeric_cols:
 
-            grouped = df.groupby(cat)[num].mean()
+            grp = df.groupby(cat)[num].mean()
 
-            fig, ax = plt.subplots()
+            fig,ax = plt.subplots()
 
-            grouped.plot(kind="bar", ax=ax)
-
-            ax.set_title(f"{cat} vs {num}")
+            grp.plot(kind="bar",ax=ax)
 
             st.pyplot(fig)
 
-            best = grouped.idxmax()
-            worst = grouped.idxmin()
-
-            st.write(f"Best {cat}: {best}")
-            st.write(f"Worst {cat}: {worst}")
+            best = grp.idxmax()
+            worst = grp.idxmin()
 
             insights.append(f"{best} drives the highest {num} within {cat}")
-            insights.append(f"{worst} significantly underperforms in {cat}")
+            insights.append(f"{worst} shows lowest performance in {cat}")
 
-            suggestions.append(
-                f"Investigate operational practices behind {best} in {cat} "
-                f"and replicate those strategies across lower performing segments like {worst}."
-            )
+# -------------------------
+# PIE CHARTS
+# -------------------------
+
+    st.header("Distribution Share")
+
+    for cat in cat_cols:
+
+        counts = df[cat].value_counts()
+
+        fig,ax = plt.subplots()
+
+        counts.plot(kind="pie",autopct='%1.1f%%',ax=ax)
+
+        ax.set_ylabel("")
+
+        st.subheader(cat)
+        st.pyplot(fig)
 
 # -------------------------
 # CORRELATION
@@ -126,25 +140,25 @@ if file:
 
     if len(numeric_cols) > 1:
 
-        st.header("Correlation Heatmap")
+        st.header("Correlation")
 
         corr = df[numeric_cols].corr()
 
-        fig, ax = plt.subplots()
+        fig,ax = plt.subplots()
 
         cax = ax.matshow(corr)
 
         fig.colorbar(cax)
 
         ax.set_xticks(range(len(corr.columns)))
-        ax.set_xticklabels(corr.columns, rotation=90)
+        ax.set_xticklabels(corr.columns,rotation=90)
 
         ax.set_yticks(range(len(corr.columns)))
         ax.set_yticklabels(corr.columns)
 
         st.pyplot(fig)
 
-        insights.append("Correlation between numeric variables detected")
+        insights.append("Strong relationships may exist between numeric variables")
 
 # -------------------------
 # TREND ANALYSIS
@@ -152,65 +166,135 @@ if file:
 
     st.header("Trend Analysis")
 
-    date_col = None
-
-    for col in df.columns:
-
-        name = col.lower()
-
-        if "date" in name or "day" in name or "time" in name:
-
-            try:
-                df[col] = pd.to_datetime(df[col])
-                date_col = col
-                break
-            except:
-                pass
-
     if date_col:
 
-        st.write(f"Detected date column: {date_col}")
+        st.write("Detected date column:",date_col)
+
+        df = df.sort_values(date_col)
 
         for num in numeric_cols:
 
-            trend = df.groupby(date_col)[num].sum()
+            # DAILY TREND
 
-            fig, ax = plt.subplots()
+            daily = df.groupby(date_col)[num].sum()
 
-            trend.plot(ax=ax)
+            fig,ax = plt.subplots()
 
-            ax.set_title(f"{num} Trend")
+            daily.plot(ax=ax)
+
+            ax.set_title("Daily Trend")
 
             st.pyplot(fig)
 
-        insights.append("Sales trend over time detected")
+            # MONTHLY TREND
 
-        suggestions.append(
-            "Analyze seasonal spikes in the trend chart and align marketing campaigns "
-            "or inventory planning to high demand periods."
-        )
+            df["month"] = df[date_col].dt.to_period("M")
+
+            monthly = df.groupby("month")[num].sum()
+
+            fig,ax = plt.subplots()
+
+            monthly.plot(ax=ax)
+
+            ax.set_title("Monthly Trend")
+
+            st.pyplot(fig)
+
+            # MOVING AVERAGE
+
+            ma = daily.rolling(7).mean()
+
+            fig,ax = plt.subplots()
+
+            daily.plot(ax=ax,label="Actual")
+
+            ma.plot(ax=ax,label="7-day moving avg")
+
+            ax.legend()
+
+            st.pyplot(fig)
+
+            insights.append("Sales moving average indicates short term trend smoothing")
+
+            # SEASONALITY
+
+            df["weekday"] = df[date_col].dt.day_name()
+
+            season = df.groupby("weekday")[num].mean()
+
+            fig,ax = plt.subplots()
+
+            season.plot(kind="bar",ax=ax)
+
+            ax.set_title("Weekly Seasonality")
+
+            st.pyplot(fig)
+
+            best_day = season.idxmax()
+
+            insights.append(f"Highest sales typically occur on {best_day}")
 
     else:
 
-        st.info("No date column found. Trend analysis skipped.")
+        st.info("No date column detected")
 
 # -------------------------
-# AI INSIGHTS
+# SMART BUSINESS SUGGESTIONS
+# -------------------------
+
+    if "Region" in df.columns:
+
+        region_sales = df.groupby("Region")[numeric_cols[0]].sum()
+
+        top_region = region_sales.idxmax()
+
+        suggestions.append(
+        f"{top_region} region contributes the largest share of revenue. "
+        "Expanding inventory and marketing spend in similar demographic regions "
+        "may accelerate growth."
+        )
+
+    if "Product_Category" in df.columns:
+
+        cat_sales = df.groupby("Product_Category")[numeric_cols[0]].sum()
+
+        weak_cat = cat_sales.idxmin()
+
+        suggestions.append(
+        f"{weak_cat} category generates the lowest sales share. "
+        "Consider pricing adjustments, product bundling, or targeted promotions."
+        )
+
+    if "Manager" in df.columns:
+
+        mgr_sales = df.groupby("Manager")[numeric_cols[0]].sum()
+
+        best_mgr = mgr_sales.idxmax()
+
+        suggestions.append(
+        f"{best_mgr} consistently drives strong performance. "
+        "Analyzing their sales strategy could reveal replicable practices."
+        )
+
+# -------------------------
+# BUSINESS INSIGHTS
 # -------------------------
 
     st.header("Business Insights")
 
     for i in insights:
-        st.write("•", i)
+
+        st.write("•",i)
 
 # -------------------------
-# STRATEGIC SUGGESTIONS
+# RECOMMENDATIONS
 # -------------------------
 
     st.header("Strategic Recommendations")
 
     for s in suggestions:
-        st.write("•", s)
+
+        st.write("•",s)
 
 # -------------------------
 # PPT
@@ -218,12 +302,12 @@ if file:
 
     if st.button("Generate PowerPoint Report"):
 
-        generate_ppt(insights, suggestions)
+        generate_ppt(insights,suggestions)
 
-        with open("analysis_report.pptx","rb") as f:
+        with open("business_report.pptx","rb") as f:
 
             st.download_button(
                 "Download PPT",
                 f,
-                file_name="AI_Data_Analysis_Report.pptx"
+                file_name="business_report.pptx"
             )
