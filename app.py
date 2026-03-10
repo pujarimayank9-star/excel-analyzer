@@ -9,14 +9,13 @@ from pptx.util import Inches
 import tempfile
 
 st.set_page_config(layout="wide")
-
 st.title("Universal Excel Data Analyst")
 
 file = st.file_uploader("Upload Excel / CSV", type=["xlsx","csv"])
 
 if file:
 
-    # LOAD DATA
+    # ---------------- LOAD DATA ----------------
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
     else:
@@ -33,53 +32,49 @@ if file:
     recommendations = []
     charts = []
 
-    # --------------------------
-    # INSIGHT FUNCTIONS
-    # --------------------------
+    # ---------------- INSIGHT FUNCTIONS ----------------
 
     def histogram_insight(col, avg, mn, mx):
-        templates = [
-            f"{col} ranges from {mn} to {mx} with an average of {round(avg,2)}, showing the spread of values in the dataset.",
-            f"The distribution of {col} varies between {mn} and {mx} with mean around {round(avg,2)}.",
-            f"{col} values fluctuate between {mn} and {mx}, suggesting moderate variability."
+        t = [
+            f"{col} ranges between {mn} and {mx} with an average of {round(avg,2)} indicating the spread of values.",
+            f"The distribution of {col} spans from {mn} to {mx} with mean around {round(avg,2)}.",
+            f"{col} values fluctuate between {mn} and {mx}, suggesting variability in the dataset."
         ]
-        return random.choice(templates)
+        return random.choice(t)
 
     def bar_insight(col, data):
         best = data.idxmax()
         worst = data.idxmin()
 
-        templates = [
-            f"In {col}, {best} records the highest value while {worst} appears the lowest.",
-            f"{best} leads the {col} comparison whereas {worst} contributes the least.",
-            f"{best} dominates {col} while {worst} has the smallest presence."
+        t = [
+            f"In {col}, {best} shows the highest presence while {worst} appears least.",
+            f"{best} dominates the {col} comparison whereas {worst} contributes the lowest.",
+            f"{best} leads performance in {col} while {worst} has minimal representation."
         ]
 
-        return random.choice(templates), best, worst
+        return random.choice(t), best, worst
 
     def pie_insight(col, counts):
         top = counts.idxmax()
         percent = round((counts.max()/counts.sum())*100,1)
 
-        templates = [
-            f"{top} represents the largest share in {col} contributing about {percent}%.",
+        t = [
+            f"{top} holds the largest share in {col} contributing about {percent}%.",
             f"{top} dominates the distribution of {col} with roughly {percent}% share.",
             f"{top} accounts for the highest proportion of {col}."
         ]
 
-        return random.choice(templates)
+        return random.choice(t)
 
     def recommendation(best, worst, col):
-        templates = [
+        t = [
             f"Investigate why {best} performs strongly in {col} and replicate similar strategies.",
             f"Focus on improving the performance of {worst} within {col}.",
             f"Practices used by {best} could help improve other segments in {col}."
         ]
-        return random.choice(templates)
+        return random.choice(t)
 
-    # --------------------------
-    # NUMERIC ANALYSIS
-    # --------------------------
+    # ---------------- NUMERIC ANALYSIS ----------------
 
     st.header("Numeric Analysis")
 
@@ -102,16 +97,12 @@ if file:
         st.pyplot(fig)
 
         insight = histogram_insight(col, avg, mn, mx)
-
         st.write("Insight:", insight)
 
         insights.append(insight)
-
         charts.append((col,fig))
 
-    # --------------------------
-    # CATEGORY ANALYSIS
-    # --------------------------
+    # ---------------- CATEGORY ANALYSIS ----------------
 
     st.header("Category Analysis")
 
@@ -123,18 +114,16 @@ if file:
 
             counts = df[cat].value_counts()
 
-            # BAR CHART
+            # BAR
             fig1, ax = plt.subplots()
             counts.plot(kind="bar", ax=ax)
 
             st.pyplot(fig1)
 
             insight, best, worst = bar_insight(cat, counts)
-
             st.write("Insight:", insight)
 
             rec = recommendation(best, worst, cat)
-
             st.write("Recommendation:", rec)
 
             insights.append(insight)
@@ -142,23 +131,20 @@ if file:
 
             charts.append((cat+"_bar", fig1))
 
-            # PIE CHART
+            # PIE
             fig2, ax = plt.subplots()
             counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
 
             st.pyplot(fig2)
 
             pie_i = pie_insight(cat, counts)
-
             st.write("Insight:", pie_i)
 
             insights.append(pie_i)
 
             charts.append((cat+"_pie", fig2))
 
-    # --------------------------
-    # CORRELATION ANALYSIS
-    # --------------------------
+    # ---------------- CORRELATION ANALYSIS ----------------
 
     if len(numeric_cols) > 1:
 
@@ -167,7 +153,6 @@ if file:
         corr = df[numeric_cols].corr()
 
         fig, ax = plt.subplots(figsize=(6,5))
-
         cax = ax.imshow(corr, cmap="coolwarm")
 
         ax.set_xticks(range(len(corr.columns)))
@@ -196,28 +181,42 @@ if file:
                 col2 = corr.columns[j]
                 value = corr.iloc[i,j]
 
-                if value > 0.7:
-
-                    insight = f"There is a strong positive relationship between {col1} and {col2} (correlation {round(value,2)}). When {col1} increases, {col2} also tends to increase."
-
-                elif value > 0.4:
-
-                    insight = f"{col1} and {col2} show a moderate relationship ({round(value,2)}), indicating some connection between these variables."
-
-                elif value < -0.7:
-
-                    insight = f"{col1} and {col2} have a strong negative relationship ({round(value,2)}). When {col1} increases, {col2} tends to decrease."
-
+                if abs(value) < 0.2:
+                    relation = "very weak relationship"
+                elif abs(value) < 0.4:
+                    relation = "weak relationship"
+                elif abs(value) < 0.7:
+                    relation = "moderate relationship"
                 else:
-                    continue
+                    relation = "strong relationship"
+
+                if value > 0:
+                    direction = "positive"
+                else:
+                    direction = "negative"
+
+                insight = (
+                    f"{col1} and {col2} show a {relation} ({direction}) "
+                    f"with correlation value {round(value,2)}. "
+                    f"This means changes in {col1} are associated with similar "
+                    f"changes in {col2}." if value>0 else
+                    f"{col1} and {col2} show a {relation} ({direction}) "
+                    f"with correlation value {round(value,2)}. "
+                    f"As {col1} increases, {col2} tends to decrease."
+                )
 
                 st.write("Insight:", insight)
-
                 insights.append(insight)
 
-    # --------------------------
-    # PPT GENERATION
-    # --------------------------
+                rec = (
+                    f"Monitor interaction between {col1} and {col2} as their relationship "
+                    f"may influence performance trends."
+                )
+
+                st.write("Recommendation:", rec)
+                recommendations.append(rec)
+
+    # ---------------- PPT GENERATION ----------------
 
     if st.button("Generate PPT Report"):
 
