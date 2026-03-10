@@ -8,13 +8,13 @@ from pptx.util import Inches
 import tempfile
 
 st.set_page_config(layout="wide")
-st.title("Universal Excel Data Analyst")
+st.title("AI Smart Excel Data Analyst")
 
 file = st.file_uploader("Upload Excel / CSV", type=["xlsx","csv"])
 
 if file:
 
-    # -------- LOAD DATA --------
+    # ---------- LOAD DATA ----------
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
     else:
@@ -29,7 +29,21 @@ if file:
 
     reports = []
 
-    # -------- NUMERIC ANALYSIS --------
+    # ---------- DATASET TYPE DETECTION ----------
+
+    dataset_type = "generic"
+
+    columns_lower = [c.lower() for c in df.columns]
+
+    if any(x in columns_lower for x in ["sales","revenue","profit"]):
+        dataset_type = "sales"
+
+    if any(x in columns_lower for x in ["marks","score","grade","attendance"]):
+        dataset_type = "education"
+
+    st.write("Detected Dataset Type:", dataset_type)
+
+    # ---------- NUMERIC ANALYSIS ----------
 
     st.header("Numeric Analysis")
 
@@ -63,7 +77,7 @@ if file:
             "insight": insight
         })
 
-    # -------- CATEGORY ANALYSIS --------
+    # ---------- CATEGORY ANALYSIS ----------
 
     st.header("Category Analysis")
 
@@ -99,7 +113,7 @@ if file:
                 "insight": insight
             })
 
-    # -------- CORRELATION ANALYSIS --------
+    # ---------- CORRELATION ANALYSIS ----------
 
     if len(numeric_cols) > 1:
 
@@ -125,7 +139,7 @@ if file:
 
         st.pyplot(fig)
 
-        correlation_explanation = ""
+        correlation_text = ""
 
         for i in range(len(corr.columns)):
             for j in range(i+1, len(corr.columns)):
@@ -141,97 +155,126 @@ if file:
                 else:
                     relation = "weak"
 
-                correlation_explanation += f"{col1} vs {col2} shows {relation} relationship ({round(val,2)}). "
+                text = f"{col1} vs {col2} shows {relation} relationship ({round(val,2)})."
 
-                st.write("Insight:", f"{col1} vs {col2} → correlation {round(val,2)} ({relation}).")
+                st.write("Insight:", text)
+
+                correlation_text += text + " "
 
         reports.append({
             "title": "Correlation",
             "chart1": fig,
             "chart2": None,
-            "insight": correlation_explanation
+            "insight": correlation_text
         })
 
-    # -------- DATASET LEVEL OBSERVATION --------
+    # ---------- SMART DATASET OBSERVATION ----------
 
-    st.header("Dataset Level Observations")
+    st.header("Dataset Observations")
 
     observations = []
 
-    if len(numeric_cols) > 0:
+    if dataset_type == "sales":
 
-        variability = df[numeric_cols].std().mean()
-        avg_value = df[numeric_cols].mean().mean()
+        observations.append(
+            "Sales datasets typically depend on regional performance, seasonality and product demand."
+        )
 
-        if variability > avg_value*0.3:
-            observations.append(
-                "Numeric metrics vary significantly across the dataset indicating inconsistent performance."
-            )
-        else:
-            observations.append(
-                "Numeric values appear relatively stable across observations."
-            )
+        if len(numeric_cols) > 0:
 
-    if len(numeric_cols) > 1:
+            variability = df[numeric_cols].std().mean()
 
-        corr_values = df[numeric_cols].corr().abs().values.flatten()
-        corr_values = corr_values[corr_values < 1]
+            if variability > df[numeric_cols].mean().mean()*0.3:
 
-        if len(corr_values)>0:
-
-            strongest = corr_values.max()
-
-            if strongest > 0.6:
                 observations.append(
-                    "Some variables show strong interaction meaning improvement in one may influence others."
+                    "Sales values vary significantly which may indicate inconsistent demand across regions or time periods."
                 )
+
             else:
+
                 observations.append(
-                    "Most variables behave independently with limited interaction."
+                    "Sales appear relatively stable suggesting consistent demand patterns."
                 )
+
+    elif dataset_type == "education":
+
+        observations.append(
+            "Academic datasets often reveal performance differences across subjects or attendance patterns."
+        )
+
+        if len(numeric_cols) > 0:
+
+            variability = df[numeric_cols].std().mean()
+
+            if variability > df[numeric_cols].mean().mean()*0.3:
+
+                observations.append(
+                    "Student performance varies across subjects indicating uneven academic strengths."
+                )
+
+            else:
+
+                observations.append(
+                    "Student performance appears relatively consistent across metrics."
+                )
+
+    else:
+
+        observations.append(
+            "The dataset contains general numeric and categorical variables which may represent operational or survey data."
+        )
 
     for obs in observations:
         st.write("Observation:", obs)
 
-    # -------- STRATEGIC RECOMMENDATIONS --------
+    # ---------- SMART RECOMMENDATIONS ----------
 
     st.header("Strategic Recommendations")
 
     recommendations = []
 
-    if len(numeric_cols)>0:
-
-        avg_vals = df[numeric_cols].mean().sort_values()
-
-        weakest = avg_vals.index[0]
-        strongest = avg_vals.index[-1]
+    if dataset_type == "sales":
 
         recommendations.append(
-            f"{weakest} appears weakest on average while {strongest} performs strongest."
+            "Identify high performing segments and replicate successful strategies across weaker regions or periods."
         )
 
         recommendations.append(
-            "Focus improvement strategies on weaker metrics while replicating practices used in stronger ones."
+            "Analyze time based patterns to detect seasonal demand and adjust inventory or marketing accordingly."
         )
 
-    if len(cat_cols)>0:
+    elif dataset_type == "education":
 
         recommendations.append(
-            "Review categorical distribution to ensure balanced representation across categories."
+            "Provide targeted academic support for subjects where performance variability is highest."
+        )
+
+        recommendations.append(
+            "Use attendance and performance patterns to identify students needing additional assistance."
+        )
+
+    else:
+
+        recommendations.append(
+            "Investigate key drivers behind high and low values to understand operational performance."
+        )
+
+        recommendations.append(
+            "Focus improvement strategies on weaker performing metrics while maintaining strengths."
         )
 
     for r in recommendations:
         st.write("Recommendation:", r)
 
-    # -------- PPT GENERATION --------
+    # ---------- PPT GENERATION ----------
 
     if st.button("Generate PPT Report"):
 
         prs = Presentation()
 
         slide = prs.slides.add_slide(prs.slide_layouts[0])
-        slide.shapes.title.text = "Automated Data Analysis Report"
-        slide.placeholders[1].text = "Generated from Excel Dataset"
+        slide.shapes.title.text = "AI Data Analysis Report"
+        slide.placeholders[1].text = "Generated automatically"
 
         for item in reports:
 
