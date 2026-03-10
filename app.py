@@ -1,165 +1,124 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from pptx import Presentation
 from pptx.util import Inches
 
-st.set_page_config(page_title="Excel Analyzer Pro", layout="wide")
+st.set_page_config(page_title="AI Data Analyst", layout="wide")
 
-st.title("📊 Excel Smart Data Analyzer")
+st.title("🤖 AI Data Analyst + Auto Presentation Generator")
 
-file = st.file_uploader("Upload Excel File", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
-
-def generate_ppt(df):
+def generate_ppt(df, insights):
 
     prs = Presentation()
 
     slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = "Excel Data Analysis Report"
+    slide.shapes.title.text = "AI Data Analysis Report"
     slide.placeholders[1].text = "Automatically generated"
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     slide.shapes.title.text = "Dataset Overview"
 
+    rows, cols = df.shape
+
     slide.placeholders[1].text = f"""
-Rows: {df.shape[0]}
-Columns: {df.shape[1]}
+Rows: {rows}
+Columns: {cols}
 """
 
-    charts = []
-
-    numeric_cols = df.select_dtypes(include="number").columns
-    cat_cols = df.select_dtypes(include="object").columns
-
-    # Store comparison
-    if "Store" in df.columns and "Weekly_Sales" in df.columns:
-
-        data = df.groupby("Store")["Weekly_Sales"].sum()
-
-        plt.figure()
-        data.plot(kind="bar")
-        plt.title("Sales by Store")
-
-        file = "store_chart.png"
-        plt.savefig(file)
-        charts.append(file)
-
-    # Region comparison
-    if "Region" in df.columns and "Weekly_Sales" in df.columns:
-
-        data = df.groupby("Region")["Weekly_Sales"].sum()
-
-        plt.figure()
-        data.plot(kind="bar")
-        plt.title("Sales by Region")
-
-        file = "region_chart.png"
-        plt.savefig(file)
-        charts.append(file)
-
-    # Distribution chart
-    if "Weekly_Sales" in df.columns:
-
-        plt.figure()
-        df["Weekly_Sales"].plot(kind="hist")
-        plt.title("Sales Distribution")
-
-        file = "distribution.png"
-        plt.savefig(file)
-        charts.append(file)
-
-    # add charts to ppt
-    for c in charts:
-
-        slide = prs.slides.add_slide(prs.slide_layouts[5])
-        slide.shapes.title.text = "Chart"
-        slide.shapes.add_picture(c, Inches(1), Inches(2), width=Inches(6))
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "AI Insights"
+    slide.placeholders[1].text = "\n".join(insights)
 
     prs.save("report.pptx")
 
 
-if file:
+if uploaded_file:
 
-    df = pd.read_excel(file)
+    df = pd.read_excel(uploaded_file)
 
     st.subheader("Dataset Preview")
     st.dataframe(df)
 
-    # detect columns
-    numeric_cols = df.select_dtypes(include="number").columns
+    rows, cols = df.shape
 
-    st.subheader("📈 Numeric Metrics")
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    cat_cols = df.select_dtypes(include="object").columns
 
-    if "Weekly_Sales" in df.columns:
+    st.subheader("Dataset Summary")
+
+    c1,c2,c3 = st.columns(3)
+
+    c1.metric("Rows", rows)
+    c2.metric("Columns", cols)
+    c3.metric("Numeric Columns", len(numeric_cols))
+
+    insights = []
+
+    if len(numeric_cols) > 0:
+
+        st.subheader("Numeric Metrics")
+
+        col = numeric_cols[0]
 
         c1,c2,c3 = st.columns(3)
 
-        c1.metric("Average Sales", round(df["Weekly_Sales"].mean(),2))
-        c2.metric("Max Sales", df["Weekly_Sales"].max())
-        c3.metric("Min Sales", df["Weekly_Sales"].min())
+        c1.metric("Average", round(df[col].mean(),2))
+        c2.metric("Max", df[col].max())
+        c3.metric("Min", df[col].min())
 
-    # Trend chart
-    if "Date" in df.columns and "Weekly_Sales" in df.columns:
+        insights.append(f"Average {col} is {round(df[col].mean(),2)}")
 
-        st.subheader("📈 Sales Trend")
+    # Distribution charts
 
-        df["Date"] = pd.to_datetime(df["Date"])
+    st.subheader("Distribution Analysis")
 
-        trend = df.sort_values("Date")
-
-        fig, ax = plt.subplots()
-        ax.plot(trend["Date"], trend["Weekly_Sales"])
-        st.pyplot(fig)
-
-    # Store comparison
-    if "Store" in df.columns and "Weekly_Sales" in df.columns:
-
-        st.subheader("🏪 Sales by Store")
-
-        store_sales = df.groupby("Store")["Weekly_Sales"].sum()
+    for col in numeric_cols:
 
         fig, ax = plt.subplots()
-        store_sales.plot(kind="bar", ax=ax)
+
+        df[col].plot(kind="hist", ax=ax)
+
+        ax.set_title(f"{col} Distribution")
+
         st.pyplot(fig)
 
-        st.success(f"Best Store: {store_sales.idxmax()}")
-        st.warning(f"Lowest Store: {store_sales.idxmin()}")
+    # Category vs numeric
 
-    # Region comparison
-    if "Region" in df.columns and "Weekly_Sales" in df.columns:
+    if len(cat_cols) > 0 and len(numeric_cols) > 0:
 
-        st.subheader("🌍 Sales by Region")
+        st.subheader("Category Comparison")
 
-        region_sales = df.groupby("Region")["Weekly_Sales"].sum()
+        cat = cat_cols[0]
+        num = numeric_cols[0]
+
+        data = df.groupby(cat)[num].mean()
 
         fig, ax = plt.subplots()
-        region_sales.plot(kind="bar", ax=ax)
+
+        data.plot(kind="bar", ax=ax)
+
+        ax.set_title(f"{num} by {cat}")
+
         st.pyplot(fig)
 
-        st.success(f"Best Region: {region_sales.idxmax()}")
-        st.warning(f"Lowest Region: {region_sales.idxmin()}")
-
-    # Distribution
-    if "Weekly_Sales" in df.columns:
-
-        st.subheader("📊 Sales Distribution")
-
-        fig, ax = plt.subplots()
-        df["Weekly_Sales"].plot(kind="hist", ax=ax)
-        st.pyplot(fig)
+        insights.append(f"{data.idxmax()} has highest {num}")
 
     # Correlation
+
     if len(numeric_cols) > 1:
 
-        st.subheader("🔗 Correlation Heatmap")
+        st.subheader("Correlation Heatmap")
 
         corr = df[numeric_cols].corr()
 
-        st.dataframe(corr)
-
         fig, ax = plt.subplots()
+
         cax = ax.matshow(corr)
+
         fig.colorbar(cax)
 
         ax.set_xticks(range(len(corr.columns)))
@@ -170,27 +129,55 @@ if file:
 
         st.pyplot(fig)
 
-    st.subheader("🧠 Automatic Insights")
+    # Trend analysis
 
-    if "Weekly_Sales" in df.columns:
+    date_cols = df.select_dtypes(include=["datetime"]).columns
 
-        avg = df["Weekly_Sales"].mean()
+    if len(date_cols) > 0 and len(numeric_cols) > 0:
 
-        if avg > 2000:
-            st.write("Sales performance is strong.")
-        elif avg > 1200:
-            st.write("Sales performance is moderate.")
-        else:
-            st.write("Sales performance is weak.")
+        st.subheader("Trend Analysis")
 
-    if st.button("📥 Generate PowerPoint Report"):
+        date = date_cols[0]
+        num = numeric_cols[0]
 
-        generate_ppt(df)
+        df = df.sort_values(date)
+
+        fig, ax = plt.subplots()
+
+        ax.plot(df[date], df[num])
+
+        st.pyplot(fig)
+
+        insights.append(f"{num} trend analyzed over time")
+
+    # AI insights
+
+    st.subheader("AI Insights")
+
+    for i in insights:
+
+        st.write("•", i)
+
+    # Recommendations
+
+    st.subheader("Business Recommendations")
+
+    if len(numeric_cols) > 0:
+
+        st.write("• Focus on improving lower performing segments")
+        st.write("• Investigate factors influencing top values")
+        st.write("• Monitor trends regularly")
+
+    # PPT
+
+    if st.button("Generate PowerPoint Report"):
+
+        generate_ppt(df, insights)
 
         with open("report.pptx","rb") as f:
 
             st.download_button(
-                "Download PPT Report",
+                "Download PPT",
                 f,
-                file_name="analysis_report.pptx"
+                file_name="AI_Data_Report.pptx"
             )
