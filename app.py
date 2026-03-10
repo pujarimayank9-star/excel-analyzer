@@ -2,13 +2,17 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="AI Data Analyzer", layout="wide")
+st.set_page_config(page_title="Excel Data Analyzer", layout="wide")
 
-st.title("AI Data Analyzer")
+st.title("Excel Data Analyzer")
 
-file = st.file_uploader("Upload Excel or CSV", type=["xlsx","csv"])
+file = st.file_uploader("Upload Excel or CSV file", type=["xlsx","csv"])
 
-if file:
+if file is not None:
+
+    # -------------------
+    # READ FILE
+    # -------------------
 
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
@@ -18,50 +22,34 @@ if file:
     st.subheader("Dataset Preview")
     st.dataframe(df)
 
-    # -------------------------
-    # CLEAN DATA
-    # -------------------------
+    # -------------------
+    # DETECT COLUMNS
+    # -------------------
 
-    # Remove completely empty columns
-    df = df.dropna(axis=1, how="all")
-
-    # Try converting everything to numeric
-    numeric_cols = []
-
-    for col in df.columns:
-
-        converted = pd.to_numeric(df[col], errors="coerce")
-
-        # If at least 1 numeric value found
-        if converted.notna().sum() > 0:
-
-            df[col] = converted
-            numeric_cols.append(col)
-
-    # Remove columns which are fully NaN after conversion
-    df = df.dropna(axis=1, how="all")
+    numeric_cols = df.select_dtypes(include=['int64','float64']).columns
+    cat_cols = df.select_dtypes(include=['object']).columns
 
     if len(numeric_cols) == 0:
-        st.error("No numeric column detected for analysis.")
+        st.error("No numeric column found.")
         st.stop()
 
     target = numeric_cols[0]
 
-    # -------------------------
+    # -------------------
     # BASIC STATS
-    # -------------------------
+    # -------------------
 
     st.header("Basic Statistics")
 
-    col1, col2, col3 = st.columns(3)
+    c1,c2,c3 = st.columns(3)
 
-    col1.metric("Average", round(df[target].mean(),2))
-    col2.metric("Max", df[target].max())
-    col3.metric("Min", df[target].min())
+    c1.metric("Average", round(df[target].mean(),2))
+    c2.metric("Maximum", df[target].max())
+    c3.metric("Minimum", df[target].min())
 
-    # -------------------------
-    # DISTRIBUTION HISTOGRAM
-    # -------------------------
+    # -------------------
+    # HISTOGRAM
+    # -------------------
 
     st.header("Distribution")
 
@@ -71,13 +59,11 @@ if file:
 
     st.pyplot(fig)
 
-    # -------------------------
+    # -------------------
     # CATEGORY ANALYSIS
-    # -------------------------
+    # -------------------
 
     st.header("Category Analysis")
-
-    cat_cols = df.select_dtypes(include=["object"]).columns
 
     for col in cat_cols:
 
@@ -89,13 +75,13 @@ if file:
 
             grp.plot(kind="bar", ax=ax)
 
-            ax.set_title(col)
+            ax.set_title(f"{target} by {col}")
 
             st.pyplot(fig)
 
-    # -------------------------
-    # PIE DISTRIBUTION
-    # -------------------------
+    # -------------------
+    # PIE CHARTS
+    # -------------------
 
     st.header("Category Share")
 
@@ -112,3 +98,59 @@ if file:
             ax.set_ylabel("")
 
             st.pyplot(fig)
+
+    # -------------------
+    # DATE DETECTION
+    # -------------------
+
+    date_col = None
+
+    for col in df.columns:
+
+        try:
+            converted = pd.to_datetime(df[col], dayfirst=True)
+            date_col = col
+            df[col] = converted
+            break
+        except:
+            pass
+
+    # -------------------
+    # TREND ANALYSIS
+    # -------------------
+
+    if date_col:
+
+        st.header("Trend Analysis")
+
+        df = df.sort_values(date_col)
+
+        trend = df.groupby(date_col)[target].sum()
+
+        fig, ax = plt.subplots()
+
+        trend.plot(ax=ax)
+
+        ax.set_title("Trend over Time")
+
+        st.pyplot(fig)
+
+    # -------------------
+    # SIMPLE INSIGHTS
+    # -------------------
+
+    st.header("Insights")
+
+    st.write(f"Average {target} value is {round(df[target].mean(),2)}")
+
+    for col in cat_cols:
+
+        if df[col].nunique() < 20:
+
+            grp = df.groupby(col)[target].mean()
+
+            best = grp.idxmax()
+            worst = grp.idxmin()
+
+            st.write(f"Best {col}: {best}")
+            st.write(f"Worst {col}: {worst}")
