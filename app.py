@@ -28,51 +28,9 @@ if file:
     numeric_cols = df.select_dtypes(include=["int64","float64"]).columns
     cat_cols = df.select_dtypes(include=["object"]).columns
 
-    insights = []
-    recommendations = []
-    charts = []
-
-    # ---------------- INSIGHT FUNCTIONS ----------------
-
-    def histogram_insight(col, avg, mn, mx):
-        t = [
-            f"{col} ranges between {mn} and {mx} with an average of {round(avg,2)} indicating the spread of values.",
-            f"The distribution of {col} spans from {mn} to {mx} with mean around {round(avg,2)}.",
-            f"{col} values fluctuate between {mn} and {mx}, suggesting variability in the dataset."
-        ]
-        return random.choice(t)
-
-    def bar_insight(col, data):
-        best = data.idxmax()
-        worst = data.idxmin()
-
-        t = [
-            f"In {col}, {best} shows the highest presence while {worst} appears least.",
-            f"{best} dominates the {col} comparison whereas {worst} contributes the lowest.",
-            f"{best} leads performance in {col} while {worst} has minimal representation."
-        ]
-
-        return random.choice(t), best, worst
-
-    def pie_insight(col, counts):
-        top = counts.idxmax()
-        percent = round((counts.max()/counts.sum())*100,1)
-
-        t = [
-            f"{top} holds the largest share in {col} contributing about {percent}%.",
-            f"{top} dominates the distribution of {col} with roughly {percent}% share.",
-            f"{top} accounts for the highest proportion of {col}."
-        ]
-
-        return random.choice(t)
-
-    def recommendation(best, worst, col):
-        t = [
-            f"Investigate why {best} performs strongly in {col} and replicate similar strategies.",
-            f"Focus on improving the performance of {worst} within {col}.",
-            f"Practices used by {best} could help improve other segments in {col}."
-        ]
-        return random.choice(t)
+    reports = []
+    overall_insights = []
+    final_recommendations = []
 
     # ---------------- NUMERIC ANALYSIS ----------------
 
@@ -93,14 +51,31 @@ if file:
 
         fig, ax = plt.subplots()
         df[col].hist(ax=ax)
-
         st.pyplot(fig)
 
-        insight = histogram_insight(col, avg, mn, mx)
+        insight = (
+            f"{col} ranges from {mn} to {mx} with an average of {round(avg,2)} "
+            f"showing how values are distributed in the dataset."
+        )
+
         st.write("Insight:", insight)
 
-        insights.append(insight)
-        charts.append((col,fig))
+        spread = mx - mn
+        if spread > avg * 0.5:
+            overall_insights.append(
+                f"{col} shows high variability meaning values fluctuate widely."
+            )
+        else:
+            overall_insights.append(
+                f"{col} values remain relatively stable across the dataset."
+            )
+
+        reports.append({
+            "title": col,
+            "chart1": fig,
+            "chart2": None,
+            "insight": insight
+        })
 
     # ---------------- CATEGORY ANALYSIS ----------------
 
@@ -114,35 +89,30 @@ if file:
 
             counts = df[cat].value_counts()
 
-            # BAR
             fig1, ax = plt.subplots()
             counts.plot(kind="bar", ax=ax)
-
             st.pyplot(fig1)
 
-            insight, best, worst = bar_insight(cat, counts)
+            best = counts.idxmax()
+            percent = round((counts.max()/counts.sum())*100,1)
+
+            insight = (
+                f"{best} represents the largest portion in {cat} "
+                f"contributing about {percent}% of the total distribution."
+            )
+
             st.write("Insight:", insight)
 
-            rec = recommendation(best, worst, cat)
-            st.write("Recommendation:", rec)
-
-            insights.append(insight)
-            recommendations.append(rec)
-
-            charts.append((cat+"_bar", fig1))
-
-            # PIE
             fig2, ax = plt.subplots()
             counts.plot(kind="pie", autopct="%1.1f%%", ax=ax)
-
             st.pyplot(fig2)
 
-            pie_i = pie_insight(cat, counts)
-            st.write("Insight:", pie_i)
-
-            insights.append(pie_i)
-
-            charts.append((cat+"_pie", fig2))
+            reports.append({
+                "title": cat,
+                "chart1": fig1,
+                "chart2": fig2,
+                "insight": insight
+            })
 
     # ---------------- CORRELATION ANALYSIS ----------------
 
@@ -170,9 +140,7 @@ if file:
 
         st.pyplot(fig)
 
-        charts.append(("correlation", fig))
-
-        st.subheader("Correlation Insights")
+        correlation_text = ""
 
         for i in range(len(corr.columns)):
             for j in range(i+1, len(corr.columns)):
@@ -181,40 +149,64 @@ if file:
                 col2 = corr.columns[j]
                 value = corr.iloc[i,j]
 
-                if abs(value) < 0.2:
-                    relation = "very weak relationship"
-                elif abs(value) < 0.4:
-                    relation = "weak relationship"
-                elif abs(value) < 0.7:
-                    relation = "moderate relationship"
+                if abs(value) > 0.7:
+                    strength = "strong"
+                elif abs(value) > 0.4:
+                    strength = "moderate"
                 else:
-                    relation = "strong relationship"
+                    strength = "weak"
 
                 if value > 0:
-                    direction = "positive"
+                    relation = "positive"
                 else:
-                    direction = "negative"
+                    relation = "negative"
 
-                insight = (
-                    f"{col1} and {col2} show a {relation} ({direction}) "
-                    f"with correlation value {round(value,2)}. "
-                    f"This means changes in {col1} are associated with similar "
-                    f"changes in {col2}." if value>0 else
-                    f"{col1} and {col2} show a {relation} ({direction}) "
-                    f"with correlation value {round(value,2)}. "
-                    f"As {col1} increases, {col2} tends to decrease."
+                explanation = (
+                    f"{col1} and {col2} have a {strength} {relation} relationship "
+                    f"(correlation {round(value,2)})."
                 )
 
-                st.write("Insight:", insight)
-                insights.append(insight)
+                st.write("Insight:", explanation)
+                correlation_text += explanation + " "
 
-                rec = (
-                    f"Monitor interaction between {col1} and {col2} as their relationship "
-                    f"may influence performance trends."
-                )
+        reports.append({
+            "title": "Correlation Analysis",
+            "chart1": fig,
+            "chart2": None,
+            "insight": correlation_text
+        })
 
-                st.write("Recommendation:", rec)
-                recommendations.append(rec)
+    # ---------------- OVERALL INSIGHTS ----------------
+
+    st.header("Overall Observations")
+
+    for text in overall_insights:
+        st.write("Insight:", text)
+
+    # ---------------- FINAL RECOMMENDATIONS ----------------
+
+    st.header("Strategic Recommendations")
+
+    for col in numeric_cols:
+
+        avg = df[col].mean()
+        mx = df[col].max()
+        std = df[col].std()
+
+        if avg < mx * 0.6:
+            final_recommendations.append(
+                f"{col} average is much lower than its maximum value suggesting "
+                f"there is room for improvement through targeted actions."
+            )
+
+        if std > avg * 0.3:
+            final_recommendations.append(
+                f"{col} shows large variation. Standardizing processes or "
+                f"improving consistency could stabilize performance."
+            )
+
+    for rec in final_recommendations:
+        st.write("Recommendation:", rec)
 
     # ---------------- PPT GENERATION ----------------
 
@@ -226,22 +218,13 @@ if file:
         slide.shapes.title.text = "Automated Data Analysis Report"
         slide.placeholders[1].text = "Generated from Excel Dataset"
 
-        i = 0
-
-        while i < len(charts):
-
-            name, chart1 = charts[i]
-
-            tmp1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            chart1.savefig(tmp1.name)
-
-            chart2 = None
-
-            if i+1 < len(charts) and "pie" in charts[i+1][0]:
-                chart2 = charts[i+1][1]
+        for item in reports:
 
             slide = prs.slides.add_slide(prs.slide_layouts[5])
-            slide.shapes.title.text = name.replace("_bar","").replace("_pie","")
+            slide.shapes.title.text = item["title"]
+
+            tmp1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            item["chart1"].savefig(tmp1.name)
 
             slide.shapes.add_picture(
                 tmp1.name,
@@ -250,10 +233,10 @@ if file:
                 height=Inches(3)
             )
 
-            if chart2:
+            if item["chart2"]:
 
                 tmp2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                chart2.savefig(tmp2.name)
+                item["chart2"].savefig(tmp2.name)
 
                 slide.shapes.add_picture(
                     tmp2.name,
@@ -262,33 +245,31 @@ if file:
                     height=Inches(3)
                 )
 
-                i += 1
+            textbox = slide.shapes.add_textbox(
+                Inches(0.5),
+                Inches(4.8),
+                Inches(9),
+                Inches(1)
+            )
 
-            if i < len(insights):
+            tf = textbox.text_frame
+            tf.text = "Insight: " + item["insight"]
 
-                textbox = slide.shapes.add_textbox(
-                    Inches(0.5),
-                    Inches(4.8),
-                    Inches(9),
-                    Inches(1)
-                )
+        # overall insights slide
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Overall Observations"
 
-                tf = textbox.text_frame
-                tf.text = "Insight: " + insights[i]
+        tf = slide.shapes.placeholders[1].text_frame
+        for ins in overall_insights:
+            tf.add_paragraph().text = ins
 
-            if i < len(recommendations):
+        # recommendation slide
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Strategic Recommendations"
 
-                textbox2 = slide.shapes.add_textbox(
-                    Inches(0.5),
-                    Inches(5.6),
-                    Inches(9),
-                    Inches(1)
-                )
-
-                tf2 = textbox2.text_frame
-                tf2.text = "Recommendation: " + recommendations[i]
-
-            i += 1
+        tf = slide.shapes.placeholders[1].text_frame
+        for rec in final_recommendations:
+            tf.add_paragraph().text = rec
 
         prs.save("analysis_report.pptx")
 
