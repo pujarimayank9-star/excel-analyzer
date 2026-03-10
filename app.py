@@ -7,15 +7,11 @@ import tempfile
 
 st.set_page_config(layout="wide")
 
-st.title("Universal AI Data Analyst")
+st.title("Universal Excel Data Analyst")
 
-file = st.file_uploader("Upload Excel or CSV", type=["xlsx","csv"])
+file = st.file_uploader("Upload Excel / CSV", type=["xlsx","csv"])
 
 if file:
-
-    # -------------------
-    # LOAD DATA
-    # -------------------
 
     if file.name.endswith(".csv"):
         df = pd.read_csv(file)
@@ -25,41 +21,32 @@ if file:
     st.subheader("Dataset Preview")
     st.dataframe(df)
 
-    # -------------------
-    # COLUMN TYPES
-    # -------------------
-
     numeric_cols = df.select_dtypes(include=["int64","float64"]).columns
     cat_cols = df.select_dtypes(include=["object"]).columns
-
-    st.write("Numeric columns:", list(numeric_cols))
-    st.write("Category columns:", list(cat_cols))
 
     charts = []
     insights = []
     recommendations = []
 
-    # -------------------
+    # -----------------------
     # NUMERIC ANALYSIS
-    # -------------------
+    # -----------------------
 
     st.header("Numeric Analysis")
 
     for col in numeric_cols:
 
-        st.subheader(col)
-
         avg = round(df[col].mean(),2)
         mx = df[col].max()
         mn = df[col].min()
 
-        c1,c2,c3 = st.columns(3)
+        st.subheader(col)
 
+        c1,c2,c3 = st.columns(3)
         c1.metric("Average",avg)
         c2.metric("Max",mx)
         c3.metric("Min",mn)
 
-        # HISTOGRAM
         fig,ax = plt.subplots()
         df[col].hist(ax=ax)
 
@@ -67,21 +54,17 @@ if file:
 
         charts.append((col,fig))
 
-        insight = f"""
-Column {col} shows an average value of {avg}.
-Maximum recorded value is {mx} while minimum is {mn}.
-This indicates the spread of values across the dataset.
-"""
-
-        insights.append(insight)
-
-        recommendations.append(
-            f"Monitor extreme values in {col} and maintain consistency."
+        insights.append(
+            f"{col} ranges from {mn} to {mx} with an average of {avg}, indicating variability in the dataset."
         )
 
-    # -------------------
+        recommendations.append(
+            f"Monitor extreme values in {col} and ensure operational consistency."
+        )
+
+    # -----------------------
     # CATEGORY ANALYSIS
-    # -------------------
+    # -----------------------
 
     st.header("Category Analysis")
 
@@ -89,43 +72,37 @@ This indicates the spread of values across the dataset.
 
         if df[cat].nunique() <= 20:
 
-            st.subheader(cat)
-
             counts = df[cat].value_counts()
 
-            # BAR
+            st.subheader(cat)
+
             fig1,ax = plt.subplots()
             counts.plot(kind="bar",ax=ax)
 
             st.pyplot(fig1)
 
-            # PIE
             fig2,ax = plt.subplots()
             counts.plot(kind="pie",autopct="%1.1f%%",ax=ax)
 
             st.pyplot(fig2)
 
-            charts.append((cat,fig1))
-            charts.append((cat,fig2))
+            charts.append((cat+"_bar",fig1))
+            charts.append((cat+"_pie",fig2))
 
             best = counts.idxmax()
             worst = counts.idxmin()
 
-            insight = f"""
-Category {best} appears most frequently in {cat}.
-Category {worst} appears least frequently.
-This suggests unequal distribution among categories.
-"""
-
-            insights.append(insight)
-
-            recommendations.append(
-                f"Investigate why {best} dominates and whether balance is needed."
+            insights.append(
+                f"In column {cat}, '{best}' appears most frequently while '{worst}' appears least frequently, indicating imbalance in category distribution."
             )
 
-    # -------------------
+            recommendations.append(
+                f"Analyse why '{best}' dominates in {cat} and explore strategies to improve '{worst}'."
+            )
+
+    # -----------------------
     # CORRELATION
-    # -------------------
+    # -----------------------
 
     if len(numeric_cols) > 1:
 
@@ -134,7 +111,6 @@ This suggests unequal distribution among categories.
         corr = df[numeric_cols].corr()
 
         fig,ax = plt.subplots()
-
         cax = ax.matshow(corr)
 
         st.pyplot(fig)
@@ -142,75 +118,91 @@ This suggests unequal distribution among categories.
         charts.append(("correlation",fig))
 
         insights.append(
-            "Correlation analysis shows relationships between numeric variables."
+            "Correlation analysis reveals relationships between numeric variables that may influence each other."
         )
 
-        recommendations.append(
-            "Investigate strongly correlated variables for deeper insights."
-        )
-
-    # -------------------
-    # INSIGHTS
-    # -------------------
+    # -----------------------
+    # INSIGHTS DISPLAY
+    # -----------------------
 
     st.header("Insights")
 
     for i in insights:
         st.write("-",i)
 
-    # -------------------
-    # RECOMMENDATIONS
-    # -------------------
-
     st.header("Recommendations")
 
     for r in recommendations:
         st.write("-",r)
 
-    # -------------------
-    # PPT GENERATION
-    # -------------------
+    # -----------------------
+    # PPT GENERATOR
+    # -----------------------
 
     if st.button("Generate Professional PPT"):
 
         prs = Presentation()
 
-        # TITLE
+        # Title
         slide = prs.slides.add_slide(prs.slide_layouts[0])
-        slide.shapes.title.text = "Automated Data Analysis"
-        slide.placeholders[1].text = "AI Generated Business Intelligence"
+        slide.shapes.title.text = "Automated Data Analysis Report"
+        slide.placeholders[1].text = "Generated from Excel Dataset"
 
-        # INSIGHTS
+        # Numeric summary
+        for col in numeric_cols:
+
+            avg = round(df[col].mean(),2)
+            mx = df[col].max()
+            mn = df[col].min()
+
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = f"{col} Statistics"
+
+            slide.placeholders[1].text = f"""
+Average: {avg}
+
+Maximum: {mx}
+
+Minimum: {mn}
+"""
+
+        # Category charts
+        for cat in cat_cols:
+
+            if df[cat].nunique() <= 20:
+
+                counts = df[cat].value_counts()
+
+                fig_bar,ax = plt.subplots()
+                counts.plot(kind="bar",ax=ax)
+
+                fig_pie,ax = plt.subplots()
+                counts.plot(kind="pie",autopct="%1.1f%%",ax=ax)
+
+                tmp1 = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
+                tmp2 = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
+
+                fig_bar.savefig(tmp1.name)
+                fig_pie.savefig(tmp2.name)
+
+                slide = prs.slides.add_slide(prs.slide_layouts[5])
+
+                slide.shapes.title.text = cat
+
+                slide.shapes.add_picture(tmp1.name,Inches(0.5),Inches(1.5),height=Inches(4))
+                slide.shapes.add_picture(tmp2.name,Inches(6),Inches(1.5),height=Inches(4))
+
+        # Insights slide
         slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = "Key Insights"
 
-        text = "\n".join(insights)
+        slide.placeholders[1].text = "\n".join(insights)
 
-        slide.placeholders[1].text = text
-
-        # RECOMMENDATION
+        # Recommendation slide
         slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = "Recommendations"
 
         slide.placeholders[1].text = "\n".join(recommendations)
-
-        # CHARTS
-        for name,chart in charts:
-
-            tmp = tempfile.NamedTemporaryFile(delete=False,suffix=".png")
-
-            chart.savefig(tmp.name)
-
-            slide = prs.slides.add_slide(prs.slide_layouts[5])
-
-            slide.shapes.title.text = name
-
-            slide.shapes.add_picture(
-                tmp.name,
-                Inches(1),
-                Inches(1.5),
-                height=Inches(4.5)
-            )
 
         ppt = "analysis_report.pptx"
 
