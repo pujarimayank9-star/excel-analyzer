@@ -1,76 +1,101 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from pptx import Presentation
+from pptx.util import Inches
 
-st.set_page_config(page_title="AI Business Analyzer", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Excel Analyzer + PPT Generator", layout="wide")
 
-st.title("📊 AI Excel Business Analyzer")
-st.write("Upload ANY Excel file → Automatic Charts → Insights → Recommendations")
+st.title("📊 Excel Data Analyzer + Auto PowerPoint Report")
 
-file = st.file_uploader("Upload Excel file", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
-if file is not None:
 
-    df = pd.read_excel(file)
+def generate_ppt(df):
 
-    st.subheader("📄 Raw Data")
+    prs = Presentation()
+
+    # Title slide
+    slide_layout = prs.slide_layouts[0]
+    slide = prs.slides.add_slide(slide_layout)
+
+    slide.shapes.title.text = "Excel Analysis Report"
+    slide.placeholders[1].text = "Automatically generated"
+
+    # Dataset overview
+    slide_layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(slide_layout)
+
+    slide.shapes.title.text = "Dataset Overview"
+
+    overview = f"""
+Total Rows: {df.shape[0]}
+Total Columns: {df.shape[1]}
+"""
+
+    slide.placeholders[1].text = overview
+
+    numeric_cols = df.select_dtypes(include="number").columns
+
+    if len(numeric_cols) > 0:
+
+        col = numeric_cols[0]
+
+        plt.figure()
+        df[col].plot(kind="hist")
+        plt.title(f"{col} Distribution")
+
+        chart_file = "chart.png"
+        plt.savefig(chart_file)
+
+        slide_layout = prs.slide_layouts[5]
+        slide = prs.slides.add_slide(slide_layout)
+
+        slide.shapes.title.text = f"{col} Distribution"
+
+        slide.shapes.add_picture(chart_file, Inches(1), Inches(2), width=Inches(6))
+
+    prs.save("analysis_report.pptx")
+
+
+if uploaded_file:
+
+    df = pd.read_excel(uploaded_file)
+
+    st.subheader("Dataset Preview")
     st.dataframe(df)
 
-    numeric_cols = df.select_dtypes(include=["number"]).columns
-    cat_cols = df.select_dtypes(include=["object"]).columns
+    numeric_cols = df.select_dtypes(include="number").columns
 
-    insights = []
-    recommendations = []
+    st.subheader("📈 Numeric Analysis")
 
-    # ------------------------
-    # CATEGORY vs NUMBER
-    # ------------------------
+    for col in numeric_cols:
 
-    st.header("📊 Category Analysis")
+        avg = df[col].mean()
+        max_val = df[col].max()
+        min_val = df[col].min()
 
-    for cat in cat_cols:
-        for num in numeric_cols:
+        c1, c2, c3 = st.columns(3)
 
-            try:
-                data = df.groupby(cat)[num].sum()
+        with c1:
+            st.metric(f"Average {col}", round(avg, 2))
 
-                fig, ax = plt.subplots()
-                data.plot(kind="bar", ax=ax)
-                ax.set_title(f"{num} by {cat}")
+        with c2:
+            st.metric(f"Max {col}", max_val)
 
-                st.pyplot(fig)
+        with c3:
+            st.metric(f"Min {col}", min_val)
 
-                best = data.idxmax()
-                worst = data.idxmin()
+        st.bar_chart(df[col])
 
-                st.write(f"🏆 Best {cat}: {best}")
-                st.write(f"⚠ Lowest {cat}: {worst}")
-
-                insights.append(
-                    f"{best} generates the highest {num} in {cat}, while {worst} performs the lowest."
-                )
-
-                recommendations.append(
-                    f"Focus more resources on {best} and investigate improvement strategies for {worst}."
-                )
-
-            except:
-                pass
-
-    # ------------------------
-    # CORRELATION
-    # ------------------------
+    st.subheader("🔎 Correlation Analysis")
 
     if len(numeric_cols) > 1:
 
-        st.header("🔎 Correlation Analysis")
-
         corr = df[numeric_cols].corr()
-
         st.dataframe(corr)
 
         fig, ax = plt.subplots()
-
         cax = ax.matshow(corr)
 
         plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
@@ -80,79 +105,28 @@ if file is not None:
 
         st.pyplot(fig)
 
-    # ------------------------
-    # TOP PERFORMERS
-    # ------------------------
+    st.subheader("🧠 Automatic Insights")
 
-    st.header("🏆 Top Performers")
+    for col in numeric_cols:
 
-    for cat in cat_cols:
-        for num in numeric_cols:
+        avg = df[col].mean()
 
-            try:
+        if avg > df[col].max() * 0.7:
+            st.write(f"{col} values are generally high.")
 
-                top = df.groupby(cat)[num].sum().sort_values(ascending=False).head(5)
+        elif avg < df[col].max() * 0.4:
+            st.write(f"{col} values are generally low.")
 
-                st.write(f"Top {cat} by {num}")
-                st.dataframe(top)
+        else:
+            st.write(f"{col} values are moderately distributed.")
 
-            except:
-                pass
+    if st.button("📥 Generate PowerPoint Report"):
 
-    # ------------------------
-    # SALES TREND
-    # ------------------------
+        generate_ppt(df)
 
-    if "Date" in df.columns and "Weekly_Sales" in df.columns:
-
-        st.header("📈 Sales Trend")
-
-        try:
-
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
-            df2 = df.dropna(subset=["Date"])
-
-            trend = df2.groupby("Date")["Weekly_Sales"].sum()
-
-            fig, ax = plt.subplots()
-
-            trend.plot(ax=ax)
-
-            ax.set_title("Sales Over Time")
-
-            st.pyplot(fig)
-
-        except:
-
-            st.warning("Date format not supported.")
-
-    # ------------------------
-    # AI INSIGHTS
-    # ------------------------
-
-    st.header("🧠 AI Business Insights")
-
-    if len(insights) > 0:
-
-        for i in insights[:10]:
-            st.write("•", i)
-
-    else:
-
-        st.write("Not enough categorical data.")
-
-    # ------------------------
-    # BUSINESS RECOMMENDATIONS
-    # ------------------------
-
-    st.header("🚀 Business Recommendations")
-
-    if len(recommendations) > 0:
-
-        for r in recommendations[:10]:
-            st.write("•", r)
-
-    else:
-
-        st.write("No recommendations generated.")
+        with open("analysis_report.pptx", "rb") as f:
+            st.download_button(
+                "Download PPT Report",
+                f,
+                file_name="analysis_report.pptx"
+            )
