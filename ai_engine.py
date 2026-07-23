@@ -67,7 +67,7 @@ Explain everything in simple English.
             try:
 
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="model="gemini-3-flash-preview",
                     contents=prompt
                 )
 
