@@ -1,6 +1,11 @@
 streamlit
 pandas
-matplotlib
-openpyxl
-python-pptx
 numpy
+matplotlib
+plotly
+seaborn
+python-pptx
+reportlab
+openpyxl
+google-genai
+scikit-learn
