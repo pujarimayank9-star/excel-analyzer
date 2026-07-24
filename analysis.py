@@ -246,7 +246,7 @@ def correlation_analysis(df):
     st.dataframe(corr.round(2), use_container_width=True)
 
     strong_corr = (
-        corr.where(~pd.np.eye(corr.shape[0], dtype=bool))
+        corr.where(~np.eye(corr.shape[0], dtype=bool))
             .stack()
             .reset_index()
     )
